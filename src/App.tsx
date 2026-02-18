@@ -18,6 +18,7 @@ import Reports from "./pages/Reports";
 import About from "./pages/About";
 import Profile from "./pages/Profile";
 import ConnectBroker from "./pages/ConnectBroker";
+import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route element={<AppLayout />}>
               <Route path="/" element={<Index />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/news" element={<News />} />
               <Route path="/economic" element={<Economic />} />
               <Route path="/research" element={<Research />} />
