@@ -11,10 +11,12 @@ import {
   FileBarChart,
   Info,
   User,
-  Link as LinkIcon
+  Link as LinkIcon,
+  LayoutDashboard
 } from 'lucide-react';
 
 const navItems = [
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { name: 'Economic', path: '/economic', icon: TrendingUp },
   { name: 'Research', path: '/research', icon: FileText },
   { name: 'News', path: '/news', icon: Newspaper },
