@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Activity, BarChart3, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Activity, BarChart3, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StockData {
   symbol: string;
@@ -13,6 +15,7 @@ interface StockData {
   high: number;
   low: number;
   volume: string;
+  isError?: boolean;
 }
 
 interface IndexData {
@@ -20,72 +23,64 @@ interface IndexData {
   value: number;
   change: number;
   changePercent: number;
+  isError?: boolean;
 }
 
-const generatePrice = (base: number, volatility: number) => {
-  const delta = (Math.random() - 0.48) * volatility;
-  return +(base + delta).toFixed(2);
-};
-
-const initialIndices: IndexData[] = [
-  { name: 'NIFTY 50', value: 24680.50, change: 127.35, changePercent: 0.52 },
-  { name: 'SENSEX', value: 81245.80, change: 412.60, changePercent: 0.51 },
-  { name: 'NIFTY BANK', value: 52340.15, change: -89.20, changePercent: -0.17 },
-  { name: 'NIFTY IT', value: 38920.70, change: 245.80, changePercent: 0.64 },
-];
-
-const initialStocks: StockData[] = [
-  { symbol: 'RELIANCE', name: 'Reliance Industries', price: 2945.30, change: 32.50, changePercent: 1.12, high: 2968.00, low: 2910.50, volume: '12.4M' },
-  { symbol: 'TCS', name: 'Tata Consultancy', price: 3892.45, change: -18.70, changePercent: -0.48, high: 3920.00, low: 3880.15, volume: '4.2M' },
-  { symbol: 'HDFCBANK', name: 'HDFC Bank', price: 1678.90, change: 14.25, changePercent: 0.86, high: 1685.00, low: 1660.30, volume: '8.7M' },
-  { symbol: 'INFY', name: 'Infosys', price: 1845.60, change: 22.80, changePercent: 1.25, high: 1858.00, low: 1820.40, volume: '6.1M' },
-  { symbol: 'ICICIBANK', name: 'ICICI Bank', price: 1234.75, change: -5.40, changePercent: -0.44, high: 1245.00, low: 1228.90, volume: '9.3M' },
-  { symbol: 'HINDUNILVR', name: 'Hindustan Unilever', price: 2567.80, change: 8.90, changePercent: 0.35, high: 2575.00, low: 2555.20, volume: '2.8M' },
-  { symbol: 'ITC', name: 'ITC Limited', price: 468.35, change: 6.15, changePercent: 1.33, high: 472.00, low: 461.50, volume: '15.6M' },
-  { symbol: 'SBIN', name: 'State Bank of India', price: 842.50, change: -12.30, changePercent: -1.44, high: 858.00, low: 839.70, volume: '11.2M' },
-  { symbol: 'BHARTIARTL', name: 'Bharti Airtel', price: 1567.20, change: 28.40, changePercent: 1.85, high: 1578.00, low: 1535.60, volume: '5.4M' },
-  { symbol: 'TATAMOTORS', name: 'Tata Motors', price: 978.65, change: -8.75, changePercent: -0.89, high: 992.00, low: 975.30, volume: '7.8M' },
-  { symbol: 'WIPRO', name: 'Wipro Limited', price: 542.30, change: 4.60, changePercent: 0.86, high: 548.00, low: 536.80, volume: '3.9M' },
-  { symbol: 'ADANIENT', name: 'Adani Enterprises', price: 3245.80, change: 56.90, changePercent: 1.78, high: 3268.00, low: 3185.40, volume: '4.5M' },
-];
-
 const Dashboard = () => {
-  const [indices, setIndices] = useState(initialIndices);
-  const [stocks, setStocks] = useState(initialStocks);
-  const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [isLive, setIsLive] = useState(true);
+  const [indices, setIndices] = useState<IndexData[]>([]);
+  const [stocks, setStocks] = useState<StockData[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setError(null);
+      const { data, error: fnError } = await supabase.functions.invoke('stock-data');
+
+      if (fnError) throw new Error(fnError.message);
+      if (data?.error) throw new Error(data.error);
+
+      setIndices(data.indices || []);
+      setStocks(data.stocks || []);
+      setLastUpdated(new Date(data.fetchedAt));
+    } catch (err) {
+      console.error('Failed to fetch stock data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!isLive) return;
-    const interval = setInterval(() => {
-      setIndices(prev =>
-        prev.map(idx => {
-          const newValue = generatePrice(idx.value, idx.value * 0.001);
-          const change = +(newValue - (idx.value - idx.change)).toFixed(2);
-          return { ...idx, value: newValue, change, changePercent: +((change / (newValue - change)) * 100).toFixed(2) };
-        })
-      );
-      setStocks(prev =>
-        prev.map(stock => {
-          const newPrice = generatePrice(stock.price, stock.price * 0.002);
-          const basePrice = stock.price - stock.change;
-          const change = +(newPrice - basePrice).toFixed(2);
-          return {
-            ...stock,
-            price: newPrice,
-            change,
-            changePercent: +((change / basePrice) * 100).toFixed(2),
-            high: Math.max(stock.high, newPrice),
-            low: Math.min(stock.low, newPrice),
-          };
-        })
-      );
-      setLastUpdated(new Date());
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [isLive]);
+    fetchData();
+  }, [fetchData]);
 
-  const marketUp = indices[0].change >= 0;
+  useEffect(() => {
+    if (!autoRefresh) return;
+    // Refresh every 60s to stay within API limits (800/day)
+    const interval = setInterval(fetchData, 60000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, fetchData]);
+
+  const validStocks = stocks.filter(s => !s.isError);
+  const marketUp = indices.length > 0 && !indices[0].isError ? indices[0].change >= 0 : true;
+
+  if (loading) {
+    return (
+      <div className="flex-1 overflow-auto p-6 space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28" />)}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-auto p-6 space-y-6">
@@ -94,23 +89,36 @@ const Dashboard = () => {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Market Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            Last updated: {lastUpdated.toLocaleTimeString()}
+            {lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString()}` : 'Loading...'}
+            {' · '}Live NSE market data
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant={isLive ? 'default' : 'secondary'} className={isLive ? 'bg-success text-success-foreground animate-pulse-glow' : ''}>
-            {isLive ? '● LIVE' : '● PAUSED'}
+          <Badge variant={autoRefresh ? 'default' : 'secondary'} className={autoRefresh ? 'bg-success text-success-foreground animate-pulse-glow' : ''}>
+            {autoRefresh ? '● LIVE' : '● PAUSED'}
           </Badge>
-          <Button variant="outline" size="sm" onClick={() => setIsLive(!isLive)}>
-            <RefreshCw className={`w-4 h-4 mr-1 ${isLive ? 'animate-spin' : ''}`} style={isLive ? { animationDuration: '3s' } : {}} />
-            {isLive ? 'Pause' : 'Resume'}
+          <Button variant="outline" size="sm" onClick={() => setAutoRefresh(!autoRefresh)}>
+            <RefreshCw className={`w-4 h-4 mr-1 ${autoRefresh ? 'animate-spin' : ''}`} style={autoRefresh ? { animationDuration: '3s' } : {}} />
+            {autoRefresh ? 'Pause' : 'Resume'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={fetchData}>
+            <RefreshCw className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
+      {error && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="p-4 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-destructive" />
+            <p className="text-sm text-destructive">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Market Indices */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {indices.map((idx) => {
+        {indices.filter(idx => !idx.isError).map((idx) => {
           const up = idx.change >= 0;
           return (
             <Card key={idx.name} className="bg-card border-border hover:border-primary/40 transition-colors">
@@ -156,7 +164,7 @@ const Dashboard = () => {
             <div>
               <p className="text-sm text-muted-foreground">Gainers</p>
               <p className="text-lg font-bold text-success">
-                {stocks.filter(s => s.change > 0).length} stocks
+                {validStocks.filter(s => s.change > 0).length} stocks
               </p>
             </div>
           </CardContent>
@@ -169,7 +177,7 @@ const Dashboard = () => {
             <div>
               <p className="text-sm text-muted-foreground">Losers</p>
               <p className="text-lg font-bold text-destructive">
-                {stocks.filter(s => s.change < 0).length} stocks
+                {validStocks.filter(s => s.change < 0).length} stocks
               </p>
             </div>
           </CardContent>
@@ -184,7 +192,7 @@ const Dashboard = () => {
               <BarChart3 className="w-5 h-5 text-primary" />
               Top NSE Stocks
             </CardTitle>
-            <span className="text-xs text-muted-foreground">Simulated live data • Refresh every 3s</span>
+            <span className="text-xs text-muted-foreground">Live data • Refreshes every 60s</span>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -203,7 +211,7 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {stocks.map((stock) => {
+                {validStocks.map((stock) => {
                   const up = stock.change >= 0;
                   return (
                     <tr key={stock.symbol} className="border-b border-border/50 hover:bg-secondary/50 transition-colors">
