@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,8 +70,29 @@ const ConnectBroker = () => {
   const [connectedBrokers, setConnectedBrokers] = useState<string[]>([]);
   
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to connect your broker account.",
+        variant: "destructive",
+      });
+      navigate('/auth');
+    }
+  }, [user, loading, navigate, toast]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   const handleConnect = async () => {
     if (!user) {
