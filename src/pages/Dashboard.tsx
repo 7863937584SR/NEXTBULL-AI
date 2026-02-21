@@ -5,6 +5,7 @@ import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Activity, BarCh
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import StockCharts from '@/components/dashboard/StockCharts';
 
 interface StockData {
   symbol: string;
@@ -183,6 +184,9 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Stock Charts */}
+      {validStocks.length > 0 && <StockCharts stocks={validStocks} />}
 
       {/* Stocks Table */}
       <Card className="bg-card border-border">
