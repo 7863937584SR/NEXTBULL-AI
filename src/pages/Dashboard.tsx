@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import StockCharts from '@/components/dashboard/StockCharts';
+import LivePriceChart from '@/components/dashboard/LivePriceChart';
 
 interface StockData {
   symbol: string;
@@ -184,6 +185,9 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Live Price Chart */}
+      {validStocks.length > 0 && <LivePriceChart stocks={validStocks} />}
 
       {/* Stock Charts */}
       {validStocks.length > 0 && <StockCharts stocks={validStocks} />}

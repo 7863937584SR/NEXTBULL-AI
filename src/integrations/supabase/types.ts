@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      broker_connections: {
+        Row: {
+          access_token: string | null
+          broker: string
+          broker_user_id: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          token_expiry: string | null
+          updated_at: string
+          user_id: string
+          user_name: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          broker: string
+          broker_user_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          token_expiry?: string | null
+          updated_at?: string
+          user_id: string
+          user_name?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          broker?: string
+          broker_user_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          token_expiry?: string | null
+          updated_at?: string
+          user_id?: string
+          user_name?: string | null
+        }
+        Relationships: []
+      }
       chat_conversations: {
         Row: {
           created_at: string

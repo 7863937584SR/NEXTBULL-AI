@@ -1,78 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { ExternalLink, Shield, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { ExternalLink, Shield, CheckCircle2, AlertCircle, Loader2, Unplug } from 'lucide-react';
 
-interface Broker {
-  id: string;
-  name: string;
-  logo: string;
-  description: string;
-  accountTypes: string[];
+interface BrokerConnection {
+  broker: string;
+  is_active: boolean;
+  broker_user_id: string | null;
+  user_name: string | null;
+  email: string | null;
+  token_expiry: string | null;
 }
 
-const indianBrokers: Broker[] = [
-  {
-    id: 'zerodha',
-    name: 'Zerodha',
-    logo: '🟢',
-    description: "India's largest retail stockbroker with low brokerage fees",
-    accountTypes: ['Equity', 'F&O', 'Commodity', 'Currency'],
-  },
-  {
-    id: 'upstox',
-    name: 'Upstox',
-    logo: '🔵',
-    description: 'Fast and reliable trading platform with advanced charting',
-    accountTypes: ['Equity', 'F&O', 'Commodity', 'Currency'],
-  },
-  {
-    id: 'groww',
-    name: 'Groww',
-    logo: '🟣',
-    description: 'Easy-to-use platform for stocks and mutual funds',
-    accountTypes: ['Equity', 'Mutual Funds', 'F&O'],
-  },
-  {
-    id: 'angelone',
-    name: 'Angel One',
-    logo: '🔴',
-    description: 'Full-service broker with research and advisory',
-    accountTypes: ['Equity', 'F&O', 'Commodity', 'Currency', 'IPO'],
-  },
-  {
-    id: '5paisa',
-    name: '5Paisa',
-    logo: '🟠',
-    description: 'Discount broker with flat fee structure',
-    accountTypes: ['Equity', 'F&O', 'Mutual Funds', 'Insurance'],
-  },
-  {
-    id: 'icici',
-    name: 'ICICI Direct',
-    logo: '🏦',
-    description: 'Bank-backed broker with integrated 3-in-1 account',
-    accountTypes: ['Equity', 'F&O', 'Commodity', 'Currency', 'Bonds'],
-  },
-];
-
 const ConnectBroker = () => {
-  const [selectedBroker, setSelectedBroker] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
-  const [clientId, setClientId] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
-  const [connectedBrokers, setConnectedBrokers] = useState<string[]>([]);
-  
+  const [connections, setConnections] = useState<BrokerConnection[]>([]);
+  const [loadingStatus, setLoadingStatus] = useState(true);
+
   const { toast } = useToast();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
+  // Redirect if not logged in
   useEffect(() => {
     if (!loading && !user) {
       toast({
@@ -84,152 +42,247 @@ const ConnectBroker = () => {
     }
   }, [user, loading, navigate, toast]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
+  // Fetch existing connections
+  const fetchStatus = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data } = await supabase.functions.invoke('upstox-auth', {
+        body: { action: 'get_status' },
+      });
+      setConnections(data?.connections || []);
+    } catch (err) {
+      console.error('Failed to fetch broker status:', err);
+    } finally {
+      setLoadingStatus(false);
+    }
+  }, [user]);
 
-  if (!user) return null;
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
 
-  const handleConnect = async () => {
-    if (!user) {
+  // Handle OAuth callback with auth code
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (!code || !user) return;
+
+    const storedApiKey = localStorage.getItem('upstox_api_key');
+    const storedApiSecret = localStorage.getItem('upstox_api_secret');
+
+    if (!storedApiKey || !storedApiSecret) {
       toast({
-        title: "Please log in",
-        description: "You need to be logged in to connect a broker.",
+        title: "Missing credentials",
+        description: "API credentials not found. Please try connecting again.",
         variant: "destructive",
       });
-      navigate('/auth');
+      navigate('/connect-broker', { replace: true });
       return;
     }
 
-    if (!selectedBroker || !apiKey || !apiSecret || !clientId) {
+    const exchangeToken = async () => {
+      setIsConnecting(true);
+      try {
+        const redirectUri = `${window.location.origin}/connect-broker`;
+        const { data, error } = await supabase.functions.invoke('upstox-auth', {
+          body: {
+            action: 'exchange_token',
+            code,
+            api_key: storedApiKey,
+            api_secret: storedApiSecret,
+            redirect_uri: redirectUri,
+          },
+        });
+
+        if (error) throw new Error(error.message);
+        if (data?.error) throw new Error(data.error);
+
+        // Clean up stored credentials
+        localStorage.removeItem('upstox_api_key');
+        localStorage.removeItem('upstox_api_secret');
+
+        toast({
+          title: "Upstox connected!",
+          description: `Welcome, ${data.user_name || 'trader'}! Your account is now linked.`,
+        });
+
+        await fetchStatus();
+        navigate('/connect-broker', { replace: true });
+      } catch (err) {
+        console.error('Token exchange error:', err);
+        toast({
+          title: "Connection failed",
+          description: err instanceof Error ? err.message : "Failed to connect Upstox",
+          variant: "destructive",
+        });
+      } finally {
+        setIsConnecting(false);
+      }
+    };
+
+    exchangeToken();
+  }, [searchParams, user]);
+
+  const handleUpstoxLogin = async () => {
+    if (!apiKey || !apiSecret) {
       toast({
-        title: "Missing information",
-        description: "Please fill in all required fields.",
+        title: "Missing credentials",
+        description: "Please enter your Upstox API Key and API Secret.",
         variant: "destructive",
       });
       return;
     }
 
     setIsConnecting(true);
+    try {
+      const redirectUri = `${window.location.origin}/connect-broker`;
 
-    // Simulate API connection
-    await new Promise(resolve => setTimeout(resolve, 2000));
+      // Store credentials temporarily for the OAuth callback
+      localStorage.setItem('upstox_api_key', apiKey);
+      localStorage.setItem('upstox_api_secret', apiSecret);
 
-    setConnectedBrokers(prev => [...prev, selectedBroker]);
-    setApiKey('');
-    setApiSecret('');
-    setClientId('');
-    setSelectedBroker(null);
-    
-    toast({
-      title: "Broker connected!",
-      description: `Your ${indianBrokers.find(b => b.id === selectedBroker)?.name} account has been connected successfully.`,
-    });
+      const { data, error } = await supabase.functions.invoke('upstox-auth', {
+        body: { action: 'get_login_url', api_key: apiKey, redirect_uri: redirectUri },
+      });
 
-    setIsConnecting(false);
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+
+      // Redirect to Upstox login
+      window.location.href = data.login_url;
+    } catch (err) {
+      console.error('Login URL error:', err);
+      localStorage.removeItem('upstox_api_key');
+      localStorage.removeItem('upstox_api_secret');
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to start login",
+        variant: "destructive",
+      });
+      setIsConnecting(false);
+    }
   };
+
+  const handleDisconnect = async (broker: string) => {
+    try {
+      await supabase.functions.invoke('upstox-auth', {
+        body: { action: 'disconnect', broker },
+      });
+      toast({ title: "Disconnected", description: `${broker} account has been disconnected.` });
+      await fetchStatus();
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to disconnect", variant: "destructive" });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
+  const isUpstoxConnected = connections.some(c => c.broker === 'upstox' && c.is_active);
+  const upstoxConnection = connections.find(c => c.broker === 'upstox' && c.is_active);
 
   return (
     <div className="p-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-foreground mb-2">Connect Broker</h1>
           <p className="text-muted-foreground">
-            Connect your trading account to enable live trading and portfolio tracking
+            Link your Upstox trading account via OAuth for live trading and portfolio tracking
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          {indianBrokers.map((broker) => {
-            const isConnected = connectedBrokers.includes(broker.id);
-            const isSelected = selectedBroker === broker.id;
-            
-            return (
-              <Card
-                key={broker.id}
-                className={`cursor-pointer transition-all duration-200 ${
-                  isSelected
-                    ? 'border-primary ring-2 ring-primary/20'
-                    : isConnected
-                    ? 'border-success bg-success/5'
-                    : 'border-border hover:border-primary/50'
-                }`}
-                onClick={() => !isConnected && setSelectedBroker(broker.id)}
-              >
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-3xl">{broker.logo}</span>
-                      <div>
-                        <CardTitle className="text-lg">{broker.name}</CardTitle>
-                        <CardDescription>{broker.description}</CardDescription>
-                      </div>
-                    </div>
-                    {isConnected && (
-                      <CheckCircle2 className="w-6 h-6 text-success" />
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {broker.accountTypes.map((type) => (
-                      <span
-                        key={type}
-                        className="px-2 py-1 text-xs bg-secondary rounded-md text-muted-foreground"
-                      >
-                        {type}
-                      </span>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        {/* Processing OAuth callback */}
+        {searchParams.get('code') && isConnecting && (
+          <Card className="border-primary mb-6">
+            <CardContent className="p-6 flex items-center gap-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <div>
+                <p className="font-semibold text-foreground">Connecting your Upstox account...</p>
+                <p className="text-sm text-muted-foreground">Please wait while we verify your credentials.</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {selectedBroker && !connectedBrokers.includes(selectedBroker) && (
+        {/* Connected broker card */}
+        {isUpstoxConnected && upstoxConnection && (
+          <Card className="border-success bg-success/5 mb-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">🔵</span>
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      Upstox
+                      <CheckCircle2 className="w-5 h-5 text-success" />
+                    </CardTitle>
+                    <CardDescription>
+                      Connected as {upstoxConnection.user_name || upstoxConnection.email || upstoxConnection.broker_user_id || 'trader'}
+                    </CardDescription>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => handleDisconnect('upstox')}>
+                  <Unplug className="w-4 h-4 mr-1" />
+                  Disconnect
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {['Equity', 'F&O', 'Commodity', 'Currency'].map(type => (
+                  <span key={type} className="px-2 py-1 text-xs bg-secondary rounded-md text-muted-foreground">
+                    {type}
+                  </span>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Connect form */}
+        {!isUpstoxConnected && !searchParams.get('code') && (
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-primary" />
-                Connect {indianBrokers.find(b => b.id === selectedBroker)?.name}
-              </CardTitle>
-              <CardDescription>
-                Enter your API credentials to connect your live trading account
-              </CardDescription>
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">🔵</span>
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-primary" />
+                    Connect Upstox
+                  </CardTitle>
+                  <CardDescription>
+                    Enter your Upstox API credentials to link your live trading account via OAuth
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
                 <AlertCircle className="w-5 h-5 text-warning mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-medium text-warning">Live Account Connection</p>
-                  <p className="text-muted-foreground">
-                    This will connect your real trading account. Ensure you have the correct API permissions enabled.
-                  </p>
+                  <p className="font-medium text-warning">Setup Instructions</p>
+                  <ol className="text-muted-foreground list-decimal list-inside space-y-1 mt-1">
+                    <li>Go to <a href="https://account.upstox.com/developer/apps" target="_blank" rel="noopener noreferrer" className="text-primary underline">Upstox Developer Console</a></li>
+                    <li>Create a new app with redirect URL: <code className="text-xs bg-secondary px-1 py-0.5 rounded">{window.location.origin}/connect-broker</code></li>
+                    <li>Copy the API Key and API Secret below</li>
+                  </ol>
                 </div>
               </div>
 
               <div className="grid gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="clientId">Client ID / User ID</Label>
-                  <Input
-                    id="clientId"
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    placeholder="Enter your client ID"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="apiKey">API Key</Label>
+                  <Label htmlFor="apiKey">API Key (Client ID)</Label>
                   <Input
                     id="apiKey"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="Enter your API key"
+                    placeholder="Enter your Upstox API key"
                   />
                 </div>
                 <div className="space-y-2">
@@ -239,28 +292,29 @@ const ConnectBroker = () => {
                     type="password"
                     value={apiSecret}
                     onChange={(e) => setApiSecret(e.target.value)}
-                    placeholder="Enter your API secret"
+                    placeholder="Enter your Upstox API secret"
                   />
                 </div>
               </div>
 
               <div className="flex items-center gap-4 pt-4">
-                <Button onClick={handleConnect} disabled={isConnecting}>
-                  {isConnecting ? 'Connecting...' : 'Connect Live Account'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setSelectedBroker(null)}
-                >
-                  Cancel
+                <Button onClick={handleUpstoxLogin} disabled={isConnecting || !apiKey || !apiSecret}>
+                  {isConnecting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Redirecting...
+                    </>
+                  ) : (
+                    'Connect via Upstox OAuth'
+                  )}
                 </Button>
               </div>
 
               <div className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
                 <ExternalLink className="w-4 h-4" />
-                <span>
-                  Need help? Visit your broker's API documentation for setup instructions.
-                </span>
+                <a href="https://upstox.com/developer/api-documentation/" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+                  Upstox API Documentation
+                </a>
               </div>
             </CardContent>
           </Card>
