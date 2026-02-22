@@ -1,18 +1,28 @@
-import { useEffect, useRef, memo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart3 } from 'lucide-react';
+import { useEffect, useRef, useState, memo } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 interface TradingViewWidgetProps {
   symbol?: string;
 }
 
-const TradingViewWidget = memo(({ symbol = 'NSE:NIFTY' }: TradingViewWidgetProps) => {
+const POPULAR_SYMBOLS = [
+  { label: 'NIFTY 50', value: 'NSE:NIFTY' },
+  { label: 'SENSEX', value: 'BSE:SENSEX' },
+  { label: 'BANK NIFTY', value: 'NSE:BANKNIFTY' },
+  { label: 'RELIANCE', value: 'NSE:RELIANCE' },
+  { label: 'TCS', value: 'NSE:TCS' },
+  { label: 'INFY', value: 'NSE:INFY' },
+  { label: 'HDFCBANK', value: 'NSE:HDFCBANK' },
+  { label: 'ICICIBANK', value: 'NSE:ICICIBANK' },
+];
+
+const TradingViewWidget = memo(({ symbol: initialSymbol = 'NSE:NIFTY' }: TradingViewWidgetProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [activeSymbol, setActiveSymbol] = useState(initialSymbol);
 
   useEffect(() => {
     if (!containerRef.current) return;
-
-    // Clear previous widget
     containerRef.current.innerHTML = '';
 
     const script = document.createElement('script');
@@ -21,14 +31,14 @@ const TradingViewWidget = memo(({ symbol = 'NSE:NIFTY' }: TradingViewWidgetProps
     script.async = true;
     script.innerHTML = JSON.stringify({
       autosize: true,
-      symbol,
+      symbol: activeSymbol,
       interval: '5',
       timezone: 'Asia/Kolkata',
       theme: 'dark',
       style: '1',
       locale: 'en',
       backgroundColor: 'rgba(14, 14, 16, 1)',
-      gridColor: 'rgba(42, 42, 52, 0.5)',
+      gridColor: 'rgba(42, 42, 52, 0.3)',
       hide_top_toolbar: false,
       hide_legend: false,
       allow_symbol_change: true,
@@ -39,18 +49,32 @@ const TradingViewWidget = memo(({ symbol = 'NSE:NIFTY' }: TradingViewWidgetProps
     });
 
     containerRef.current.appendChild(script);
-  }, [symbol]);
+  }, [activeSymbol]);
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-primary" />
-          TradingView Advanced Chart
-        </CardTitle>
-      </CardHeader>
+    <Card className="bg-card border-border overflow-hidden">
       <CardContent className="p-0">
-        <div className="tradingview-widget-container" ref={containerRef} style={{ height: '500px', width: '100%' }} />
+        {/* Symbol quick-switch bar */}
+        <div className="flex flex-wrap gap-1.5 p-3 border-b border-border bg-secondary/30">
+          {POPULAR_SYMBOLS.map(s => (
+            <Button
+              key={s.value}
+              variant={activeSymbol === s.value ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveSymbol(s.value)}
+              className="text-xs h-7 px-3"
+            >
+              {s.label}
+            </Button>
+          ))}
+        </div>
+
+        {/* Chart */}
+        <div
+          className="tradingview-widget-container"
+          ref={containerRef}
+          style={{ height: 'calc(100vh - 220px)', minHeight: '500px', width: '100%' }}
+        />
       </CardContent>
     </Card>
   );
