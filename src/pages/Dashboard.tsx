@@ -7,6 +7,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import StockCharts from '@/components/dashboard/StockCharts';
 import LivePriceChart from '@/components/dashboard/LivePriceChart';
+import TradingViewWidget from '@/components/dashboard/TradingViewWidget';
+import LightweightChart from '@/components/dashboard/LightweightChart';
 
 interface StockData {
   symbol: string;
@@ -185,6 +187,12 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* TradingView Advanced Chart */}
+      <TradingViewWidget symbol="NSE:NIFTY" />
+
+      {/* Lightweight Chart */}
+      {validStocks.length > 0 && <LightweightChart stocks={validStocks} />}
 
       {/* Live Price Chart */}
       {validStocks.length > 0 && <LivePriceChart stocks={validStocks} />}
