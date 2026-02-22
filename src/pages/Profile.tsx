@@ -1,22 +1,34 @@
+import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Calendar, LogOut } from 'lucide-react';
+import { User, Mail, Calendar, LogOut, Loader2 } from 'lucide-react';
 
 const Profile = () => {
-  const { user, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
 
-  if (!user) {
-    navigate('/auth');
-    return null;
-  }
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <div className="p-8 max-w-2xl mx-auto">
@@ -29,7 +41,7 @@ const Profile = () => {
               <User className="w-8 h-8 text-primary-foreground" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold">{user.email?.split('@')[0]}</h2>
+              <h2 className="text-xl font-semibold">{user.user_metadata?.full_name || user.email?.split('@')[0]}</h2>
               <p className="text-muted-foreground text-sm">Member</p>
             </div>
           </CardTitle>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import { createChart, ColorType, IChartApi, LineSeries, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ interface LightweightChartProps {
   stocks: StockData[];
 }
 
-const LightweightChart = ({ stocks }: LightweightChartProps) => {
+const LightweightChart = memo(({ stocks }: LightweightChartProps) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<'Line'> | null>(null);
@@ -159,6 +159,8 @@ const LightweightChart = ({ stocks }: LightweightChartProps) => {
       </CardContent>
     </Card>
   );
-};
+});
+
+LightweightChart.displayName = 'LightweightChart';
 
 export default LightweightChart;

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,23 +6,40 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import News from "./pages/News";
-import Economic from "./pages/Economic";
-import Research from "./pages/Research";
-import Sentimental from "./pages/Sentimental";
-import Journaling from "./pages/Journaling";
-import Events from "./pages/Events";
-import MarketTrace from "./pages/MarketTrace";
-import Reports from "./pages/Reports";
-import About from "./pages/About";
-import Profile from "./pages/Profile";
-import ConnectBroker from "./pages/ConnectBroker";
-import Dashboard from "./pages/Dashboard";
-import NotFound from "./pages/NotFound";
+import { Loader2 } from "lucide-react";
 
-const queryClient = new QueryClient();
+// Lazy-loaded pages for code splitting
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const News = lazy(() => import("./pages/News"));
+const Economic = lazy(() => import("./pages/Economic"));
+const Research = lazy(() => import("./pages/Research"));
+const Sentimental = lazy(() => import("./pages/Sentimental"));
+const Journaling = lazy(() => import("./pages/Journaling"));
+const Events = lazy(() => import("./pages/Events"));
+const MarketTrace = lazy(() => import("./pages/MarketTrace"));
+const Reports = lazy(() => import("./pages/Reports"));
+const About = lazy(() => import("./pages/About"));
+const Profile = lazy(() => import("./pages/Profile"));
+const ConnectBroker = lazy(() => import("./pages/ConnectBroker"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
+// Stable QueryClient instance — created outside component to avoid recreation on re-renders
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 1,
+    },
+  },
+});
+
+const PageLoader = () => (
+  <div className="flex-1 flex items-center justify-center h-[60vh]">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -30,25 +48,27 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<Index />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/news" element={<News />} />
-              <Route path="/economic" element={<Economic />} />
-              <Route path="/research" element={<Research />} />
-              <Route path="/sentimental" element={<Sentimental />} />
-              <Route path="/journaling" element={<Journaling />} />
-              <Route path="/events" element={<Events />} />
-              <Route path="/market-trace" element={<MarketTrace />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/connect-broker" element={<ConnectBroker />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<Index />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/news" element={<News />} />
+                <Route path="/economic" element={<Economic />} />
+                <Route path="/research" element={<Research />} />
+                <Route path="/sentimental" element={<Sentimental />} />
+                <Route path="/journaling" element={<Journaling />} />
+                <Route path="/events" element={<Events />} />
+                <Route path="/market-trace" element={<MarketTrace />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/connect-broker" element={<ConnectBroker />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

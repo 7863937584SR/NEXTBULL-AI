@@ -6,78 +6,43 @@
 
 @layer base {
   :root {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
-
-    --card: 240 10% 6%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 240 10% 6%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 45 93% 47%;
-    --primary-foreground: 240 10% 4%;
-
-    --secondary: 240 5% 15%;
-    --secondary-foreground: 0 0% 98%;
-
-    --muted: 240 5% 15%;
-    --muted-foreground: 240 5% 65%;
-
-    --accent: 142 76% 36%;
-    --accent-foreground: 0 0% 98%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 240 5% 18%;
-    --input: 240 5% 18%;
-    --ring: 45 93% 47%;
-
-    --radius: 0.75rem;
-
-    --sidebar-background: 45 93% 47%;
-    --sidebar-foreground: 240 10% 4%;
-    --sidebar-primary: 240 10% 4%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 45 93% 40%;
-    --sidebar-accent-foreground: 240 10% 4%;
-    --sidebar-border: 45 93% 40%;
-    --sidebar-ring: 240 10% 4%;
-
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 98%;
-    
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 98%;
-
-    --chart-1: 142 76% 36%;
-    --chart-2: 173 80% 40%;
-    --chart-3: 197 71% 52%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-  }
-
-  .dark {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 6%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 6%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 45 93% 47%;
-    --primary-foreground: 240 10% 4%;
-    --secondary: 240 5% 15%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 5% 15%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 142 76% 36%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5% 18%;
-    --input: 240 5% 18%;
-    --ring: 45 93% 47%;
+    --background: 222 18% 7%;
+    --foreground: 220 14% 86%;
+    --card: 222 16% 12%;
+    --card-foreground: 220 14% 86%;
+    --popover: 222 16% 12%;
+    --popover-foreground: 220 14% 86%;
+    --primary: 222 100% 56%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 222 13% 16%;
+    --secondary-foreground: 220 14% 86%;
+    --muted: 222 13% 16%;
+    --muted-foreground: 222 10% 50%;
+    --accent: 169 59% 40%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 4 74% 63%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 13% 18%;
+    --input: 222 13% 18%;
+    --ring: 222 100% 56%;
+    --radius: 0.5rem;
+    --sidebar-background: 222 18% 9%;
+    --sidebar-foreground: 220 14% 75%;
+    --sidebar-primary: 222 100% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 16% 15%;
+    --sidebar-accent-foreground: 220 14% 86%;
+    --sidebar-border: 222 13% 16%;
+    --sidebar-ring: 222 100% 56%;
+    --success: 169 59% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 36 100% 50%;
+    --warning-foreground: 0 0% 100%;
+    --chart-1: 169 59% 40%;
+    --chart-2: 195 74% 50%;
+    --chart-3: 222 100% 56%;
+    --chart-4: 36 100% 50%;
+    --chart-5: 4 74% 63%;
   }
 }
 
@@ -88,44 +53,682 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: 'Inter', sans-serif;
     font-weight: 700;
+    letter-spacing: -0.02em;
   }
 }
 
+/* ═══════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════ */
 @layer utilities {
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
   }
-  
+
   .card-glow {
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.1);
+    box-shadow: 0 0 30px hsl(var(--primary) / 0.06);
   }
-  
+
   .sidebar-gradient {
-    background: linear-gradient(180deg, hsl(var(--sidebar-background)) 0%, hsl(var(--sidebar-accent)) 100%);
+    background: linear-gradient(180deg, hsl(222 18% 9%) 0%, hsl(222 18% 7%) 100%);
+  }
+
+  .glass-card {
+    background: hsl(var(--card) / 0.6);
+    backdrop-filter: blur(16px);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  .neon-glow {
+    box-shadow: 0 0 15px hsl(var(--primary) / 0.15), 0 0 45px hsl(var(--primary) / 0.05);
   }
 }
 
-/* Custom scrollbar */
+/* ═══════════════════════════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════════════════════════ */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border-radius: 3px;
+  background: hsl(222 13% 22%);
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
+  background: hsl(222 13% 30%);
+}
+
+::selection {
+  background: hsl(222 100% 56% / 0.3);
+  color: hsl(0 0% 100%);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   KEYFRAME ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+
+/* Fade up — page sections */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade in — general */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Scale in — modals and cards */
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Slide from left — sidebar */
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Slide from right */
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Slide down — dropdowns */
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Float — subtle breathing */
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Pulse dot — live indicator */
+@keyframes pulse-dot {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}
+
+/* Shimmer — loading states */
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* Glow pulse — CTA buttons */
+@keyframes glow-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 5px hsl(var(--primary) / 0.2), 0 0 20px hsl(var(--primary) / 0.05);
+  }
+
+  50% {
+    box-shadow: 0 0 15px hsl(var(--primary) / 0.35), 0 0 40px hsl(var(--primary) / 0.1);
+  }
+}
+
+/* Count up — number reveal */
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.8);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Border draw — card reveal */
+@keyframes border-draw {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Rotate in — icons */
+@keyframes rotate-in {
+  from {
+    opacity: 0;
+    transform: rotate(-10deg) scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+  }
+}
+
+/* Bounce subtle */
+@keyframes bounce-subtle {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  40% {
+    transform: translateY(-4px);
+  }
+
+  60% {
+    transform: translateY(-2px);
+  }
+}
+
+/* Gradient shift — backgrounds */
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ANIMATION CLASSES
+   ═══════════════════════════════════════════════════════════ */
+
+.animate-fade-up {
+  animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slide-left {
+  animation: slide-in-left 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slide-right {
+  animation: slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+.animate-count-up {
+  animation: count-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-rotate-in {
+  animation: rotate-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 0.6s ease both;
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradient-shift 6s ease infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   STAGGER DELAYS (for child elements)
+   ═══════════════════════════════════════════════════════════ */
+.stagger-1 {
+  animation-delay: 0.05s;
+}
+
+.stagger-2 {
+  animation-delay: 0.1s;
+}
+
+.stagger-3 {
+  animation-delay: 0.15s;
+}
+
+.stagger-4 {
+  animation-delay: 0.2s;
+}
+
+.stagger-5 {
+  animation-delay: 0.25s;
+}
+
+.stagger-6 {
+  animation-delay: 0.3s;
+}
+
+.stagger-7 {
+  animation-delay: 0.35s;
+}
+
+.stagger-8 {
+  animation-delay: 0.4s;
+}
+
+.stagger-9 {
+  animation-delay: 0.45s;
+}
+
+.stagger-10 {
+  animation-delay: 0.5s;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HOVER MICRO-INTERACTIONS
+   ═══════════════════════════════════════════════════════════ */
+
+/* Card lift on hover */
+.hover-lift {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px hsl(var(--primary) / 0.08), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Card scale on hover */
+.hover-scale {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+/* Border glow on hover */
+.hover-glow {
+  transition: border-color 0.2s ease, box-shadow 0.3s ease;
+}
+
+.hover-glow:hover {
+  border-color: hsl(var(--primary) / 0.4);
+  box-shadow: 0 0 20px hsl(var(--primary) / 0.08);
+}
+
+/* Icon bounce on card hover */
+.group-hover-icon {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.group:hover .group-hover-icon {
+  transform: translateY(-2px) scale(1.1);
+}
+
+/* Text color transition */
+.hover-text-primary {
+  transition: color 0.15s ease;
+}
+
+.hover-text-primary:hover {
+  color: hsl(var(--primary));
+}
+
+/* Button press effect */
+.active-press:active {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PAGE TRANSITION
+   ═══════════════════════════════════════════════════════════ */
+main>* {
+  animation: fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIDEBAR ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+aside nav li {
+  animation: slide-in-left 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+aside nav li:nth-child(1) {
+  animation-delay: 0.02s;
+}
+
+aside nav li:nth-child(2) {
+  animation-delay: 0.04s;
+}
+
+aside nav li:nth-child(3) {
+  animation-delay: 0.06s;
+}
+
+aside nav li:nth-child(4) {
+  animation-delay: 0.08s;
+}
+
+aside nav li:nth-child(5) {
+  animation-delay: 0.10s;
+}
+
+aside nav li:nth-child(6) {
+  animation-delay: 0.12s;
+}
+
+aside nav li:nth-child(7) {
+  animation-delay: 0.14s;
+}
+
+aside nav li:nth-child(8) {
+  animation-delay: 0.16s;
+}
+
+aside nav li:nth-child(9) {
+  animation-delay: 0.18s;
+}
+
+aside nav li:nth-child(10) {
+  animation-delay: 0.20s;
+}
+
+aside nav li:nth-child(11) {
+  animation-delay: 0.22s;
+}
+
+/* Sidebar active indicator */
+aside nav a .absolute {
+  animation: border-draw 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DROPDOWN / POPOVER ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+[data-radix-popper-content-wrapper] {
+  animation: slide-down 0.2s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CARD ANIMATIONS — grids of cards get staggered reveals
+   ═══════════════════════════════════════════════════════════ */
+.grid>div,
+.grid>a {
+  animation: fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.grid>div:nth-child(1),
+.grid>a:nth-child(1) {
+  animation-delay: 0.03s;
+}
+
+.grid>div:nth-child(2),
+.grid>a:nth-child(2) {
+  animation-delay: 0.06s;
+}
+
+.grid>div:nth-child(3),
+.grid>a:nth-child(3) {
+  animation-delay: 0.09s;
+}
+
+.grid>div:nth-child(4),
+.grid>a:nth-child(4) {
+  animation-delay: 0.12s;
+}
+
+.grid>div:nth-child(5),
+.grid>a:nth-child(5) {
+  animation-delay: 0.15s;
+}
+
+.grid>div:nth-child(6),
+.grid>a:nth-child(6) {
+  animation-delay: 0.18s;
+}
+
+.grid>div:nth-child(7),
+.grid>a:nth-child(7) {
+  animation-delay: 0.21s;
+}
+
+.grid>div:nth-child(8),
+.grid>a:nth-child(8) {
+  animation-delay: 0.24s;
+}
+
+.grid>div:nth-child(9),
+.grid>a:nth-child(9) {
+  animation-delay: 0.27s;
+}
+
+.grid>div:nth-child(10),
+.grid>a:nth-child(10) {
+  animation-delay: 0.30s;
+}
+
+.grid>div:nth-child(11),
+.grid>a:nth-child(11) {
+  animation-delay: 0.33s;
+}
+
+.grid>div:nth-child(12),
+.grid>a:nth-child(12) {
+  animation-delay: 0.36s;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BADGE ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+.animate-pulse-glow {
+  animation: glow-pulse 2.5s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BUTTON HOVER ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+button,
+a,
+[role="button"] {
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+button:active,
+a:active,
+[role="button"]:active {
+  transform: scale(0.97);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SMOOTH NUMBER COUNTING
+   ═══════════════════════════════════════════════════════════ */
+[data-value] {
+  animation: count-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOOLTIP ANIMATION
+   ═══════════════════════════════════════════════════════════ */
+[data-state="delayed-open"] {
+  animation: scale-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HEADER ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+header {
+  animation: fade-in 0.3s ease both;
+}
+
+/* Ping animation (green live dot) is built into Tailwind: animate-ping */
+
+/* ═══════════════════════════════════════════════════════════
+   INPUT ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+input,
+textarea,
+select {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.15s ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.12);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TABLE ROW HOVER
+   ═══════════════════════════════════════════════════════════ */
+tr {
+  transition: background-color 0.15s ease;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SKELETON / LOADING SHIMMER
+   ═══════════════════════════════════════════════════════════ */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,
+      transparent 0%,
+      hsl(var(--primary) / 0.04) 40%,
+      hsl(var(--primary) / 0.08) 50%,
+      hsl(var(--primary) / 0.04) 60%,
+      transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   REDUCED MOTION — ACCESSIBILITY
+   ═══════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
