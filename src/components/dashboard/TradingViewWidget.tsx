@@ -26,6 +26,12 @@ const TradingViewWidget = memo(({ symbol: initialSymbol = 'NSE:NIFTY' }: Trading
     if (!chartRef.current) return;
     chartRef.current.innerHTML = '';
 
+    const widget = document.createElement('div');
+    widget.className = 'tradingview-widget-container__widget';
+    widget.style.height = 'calc(100% - 32px)';
+    widget.style.width = '100%';
+    chartRef.current.appendChild(widget);
+
     const script = document.createElement('script');
     script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
     script.type = 'text/javascript';
@@ -60,6 +66,10 @@ const TradingViewWidget = memo(({ symbol: initialSymbol = 'NSE:NIFTY' }: Trading
   useEffect(() => {
     if (!tickerRef.current) return;
     tickerRef.current.innerHTML = '';
+
+    const widget = document.createElement('div');
+    widget.className = 'tradingview-widget-container__widget';
+    tickerRef.current.appendChild(widget);
 
     const script = document.createElement('script');
     script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js';

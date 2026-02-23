@@ -157,112 +157,51 @@ async function getNSECookies(): Promise<{ cookieHeader: string; headers: Record<
   };
 }
 
+async function fetchYahooData(symbol: string, name: string): Promise<string> {
+  try {
+    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=1m`, {
+      headers: { "User-Agent": UA }
+    });
+    if (!res.ok) return "";
+    const data = await res.json();
+    const result = data?.chart?.result?.[0];
+    if (!result) return "";
+
+    const meta = result.meta;
+    const price = meta.regularMarketPrice;
+    const prevClose = meta.previousClose;
+    const chg = price - prevClose;
+    const pct = (chg / prevClose) * 100;
+
+    return `📈 ${name}: ₹${price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${chg >= 0 ? "+" : ""}${chg.toFixed(2)} | ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)\n   Prev Close: ${prevClose}\n`;
+  } catch (err) {
+    console.error(`YF fetch error for ${symbol}:`, err);
+    return "";
+  }
+}
+
 async function fetchNSEData(): Promise<string> {
   try {
-    const { headers } = await getNSECookies();
     const now = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
     const dateIST = new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
-    // Fetch multiple indices in parallel
-    const [niftyRes, bankRes, itRes, marketStatusRes] = await Promise.allSettled([
-      fetch("https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%2050", { headers }),
-      fetch("https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%20BANK", { headers }),
-      fetch("https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%20IT", { headers }),
-      fetch("https://www.nseindia.com/api/marketStatus", { headers }),
+    // Fetch indices from Yahoo Finance (Works reliably from Datacenters unlike NSE.com)
+    const [nifty, bank, it] = await Promise.allSettled([
+      fetchYahooData("^NSEI", "NIFTY 50"),
+      fetchYahooData("^NSEBANK", "BANK NIFTY"),
+      fetchYahooData("^CNXIT", "NIFTY IT")
     ]);
 
-    let report = `\n📊 LIVE NSE MARKET DATA\n📅 ${dateIST} | ⏰ ${now} IST\n${"━".repeat(50)}\n`;
+    let report = `\n📊 LIVE INDIAN MARKET DATA (via YFinance)\n📅 ${dateIST} | ⏰ ${now} IST\n${"━".repeat(50)}\n`;
 
-    // Market Status
-    if (marketStatusRes.status === "fulfilled" && marketStatusRes.value.ok) {
-      try {
-        const msData = await marketStatusRes.value.json();
-        const equityStatus = msData?.marketState?.find((m: any) => m.market === "Capital Market - Normal");
-        if (equityStatus) {
-          report += `Market Status: ${equityStatus.marketStatus} (${equityStatus.tradeDate})\n\n`;
-        }
-      } catch { }
-    }
-
-    // NIFTY 50 + Stocks
-    let allStocks: any[] = [];
-    if (niftyRes.status === "fulfilled" && niftyRes.value.ok) {
-      const niftyData = await niftyRes.value.json();
-      allStocks = niftyData.data || [];
-      const idx = allStocks.find((d: any) => d.symbol === "NIFTY 50");
-      if (idx) {
-        report += `📈 NIFTY 50: ₹${idx.lastPrice?.toLocaleString("en-IN")} (${idx.change >= 0 ? "+" : ""}${(+idx.change).toFixed(2)} | ${idx.pChange >= 0 ? "+" : ""}${(+idx.pChange).toFixed(2)}%)\n`;
-        report += `   Open: ${idx.open} | High: ${idx.dayHigh} | Low: ${idx.dayLow} | Prev Close: ${idx.previousClose}\n`;
-      }
-    }
-
-    // Bank NIFTY
-    if (bankRes.status === "fulfilled" && bankRes.value.ok) {
-      const bankData = await bankRes.value.json();
-      const bIdx = bankData.data?.find((d: any) => d.symbol === "NIFTY BANK");
-      if (bIdx) {
-        report += `🏦 BANK NIFTY: ₹${bIdx.lastPrice?.toLocaleString("en-IN")} (${bIdx.change >= 0 ? "+" : ""}${(+bIdx.change).toFixed(2)} | ${bIdx.pChange >= 0 ? "+" : ""}${(+bIdx.pChange).toFixed(2)}%)\n`;
-        report += `   Open: ${bIdx.open} | High: ${bIdx.dayHigh} | Low: ${bIdx.dayLow}\n`;
-      }
-    }
-
-    // NIFTY IT
-    if (itRes.status === "fulfilled" && itRes.value.ok) {
-      const itData = await itRes.value.json();
-      const iIdx = itData.data?.find((d: any) => d.symbol === "NIFTY IT");
-      if (iIdx) {
-        report += `💻 NIFTY IT: ₹${iIdx.lastPrice?.toLocaleString("en-IN")} (${iIdx.change >= 0 ? "+" : ""}${(+iIdx.change).toFixed(2)} | ${iIdx.pChange >= 0 ? "+" : ""}${(+iIdx.pChange).toFixed(2)}%)\n`;
-      }
-    }
-
-    // Stock-level data
-    const stocks = allStocks
-      .filter((d: any) => d.symbol !== "NIFTY 50" && d.lastPrice)
-      .map((d: any) => ({
-        sym: d.symbol,
-        name: d.meta?.companyName || d.symbol,
-        price: d.lastPrice,
-        chg: +(d.change || 0).toFixed(2),
-        pct: +(d.pChange || 0).toFixed(2),
-        high: d.dayHigh,
-        low: d.dayLow,
-        open: d.open,
-        prevClose: d.previousClose,
-        vol: d.totalTradedVolume || 0,
-        val: d.totalTradedValue || 0,
-        yearHigh: d.yearHigh,
-        yearLow: d.yearLow,
-      }));
-
-    const gainers = [...stocks].sort((a, b) => b.pct - a.pct).slice(0, 5);
-    const losers = [...stocks].sort((a, b) => a.pct - b.pct).slice(0, 5);
-    const advancers = stocks.filter(s => s.chg > 0.01).length;
-    const decliners = stocks.filter(s => s.chg < -0.01).length;
-    const unchanged = stocks.length - advancers - decliners;
-
-    report += `\n📊 MARKET BREADTH:\n`;
-    report += `   Advancing: ${advancers} | Declining: ${decliners} | Unchanged: ${unchanged}\n`;
-    report += `   A/D Ratio: ${(advancers / Math.max(decliners, 1)).toFixed(2)} ${advancers > decliners ? "(Bullish)" : advancers < decliners ? "(Bearish)" : "(Neutral)"}\n`;
-
-    report += `\n🟢 TOP 5 GAINERS:\n`;
-    gainers.forEach(s => {
-      report += `   ${s.sym} (${s.name}): ₹${s.price} (+${s.pct}%) | Vol: ${formatVol(s.vol)} | 52W: ${s.yearLow}–${s.yearHigh}\n`;
-    });
-
-    report += `\n🔴 TOP 5 LOSERS:\n`;
-    losers.forEach(s => {
-      report += `   ${s.sym} (${s.name}): ₹${s.price} (${s.pct}%) | Vol: ${formatVol(s.vol)} | 52W: ${s.yearLow}–${s.yearHigh}\n`;
-    });
-
-    report += `\n📋 ALL NIFTY 50 STOCKS (sorted by % change):\n`;
-    [...stocks].sort((a, b) => b.pct - a.pct).forEach(s => {
-      report += `   ${s.sym}: ₹${s.price} (${s.chg >= 0 ? "+" : ""}${s.pct}%) | Open: ${s.open} | High: ${s.high} | Low: ${s.low} | PrevCl: ${s.prevClose} | Vol: ${formatVol(s.vol)}\n`;
-    });
+    if (nifty.status === "fulfilled" && nifty.value) report += nifty.value;
+    if (bank.status === "fulfilled" && bank.value) report += bank.value;
+    if (it.status === "fulfilled" && it.value) report += it.value;
 
     return report;
   } catch (err) {
-    console.error("NSE fetch error:", err);
-    return "\n⚠️ Live NSE data temporarily unavailable. I'll answer from my training knowledge, but please note data may not reflect today's prices.\n";
+    console.error("NSE/YF fetch error:", err);
+    return "\n⚠️ Live Indian Index data temporarily unavailable. I'll answer from my training knowledge.\n";
   }
 }
 
@@ -388,14 +327,20 @@ async function fetchRedditSentiment(): Promise<string> {
 
 async function fetchVIXData(): Promise<string> {
   try {
-    const { headers } = await getNSECookies();
-    const res = await fetch("https://www.nseindia.com/api/allIndices", { headers });
+    const res = await fetch("https://query1.finance.yahoo.com/v8/finance/chart/^INDIAVIX?range=1d&interval=1m", {
+      headers: { "User-Agent": UA }
+    });
     if (!res.ok) return "";
     const data = await res.json();
-    const vix = data?.data?.find((d: any) => d.index === "INDIA VIX");
-    if (!vix) return "";
+    const result = data?.chart?.result?.[0];
+    if (!result) return "";
 
-    const level = +vix.last;
+    const meta = result.meta;
+    const level = meta.regularMarketPrice;
+    const prevClose = meta.previousClose;
+    const chg = level - prevClose;
+    const pct = (chg / prevClose) * 100;
+
     let interpretation = "";
     if (level < 12) interpretation = "EXTREME COMPLACENCY — potential complacent top, be cautious of reversals";
     else if (level < 15) interpretation = "LOW FEAR — range-bound market likely, option selling favorable";
@@ -404,8 +349,9 @@ async function fetchVIXData(): Promise<string> {
     else if (level < 35) interpretation = "HIGH FEAR — potential bottom forming, contrarian buying opportunities";
     else interpretation = "PANIC — extreme fear, historically near market bottoms";
 
-    return `\n📊 INDIA VIX (FEAR GAUGE):\n   Level: ${level.toFixed(2)} (${vix.percentChange >= 0 ? "+" : ""}${(+vix.percentChange).toFixed(2)}%)\n   Interpretation: ${interpretation}\n   Previous Close: ${vix.previousClose} | High: ${vix.high} | Low: ${vix.low}\n`;
-  } catch {
+    return `\n📊 INDIA VIX (FEAR GAUGE):\n   Level: ${level.toFixed(2)} (${chg >= 0 ? "+" : ""}${pct.toFixed(2)}%)\n   Interpretation: ${interpretation}\n   Previous Close: ${prevClose}\n`;
+  } catch (err) {
+    console.error("VIX fetch error:", err);
     return "";
   }
 }
@@ -477,53 +423,109 @@ ${"═".repeat(60)}`;
 
     console.log(`Context size: ${liveContext.length} chars | NSE:${liveNSE.length} FII:${liveFIIDII.length} VIX:${liveVIX.length} News:${liveNews.length} Global:${liveGlobal.length} Reddit:${liveReddit.length}`);
 
-    const response = await fetch("https://api.lovable.dev/v1/chat/completions", {
+    // Helper to call Lovable Gateway
+    const fetchModel = async (model: string, systemPrompt: string) => {
+      const res = await fetch("https://api.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...messages.map((msg: { role: string; content: string }) => ({
+              role: msg.role,
+              content: msg.content,
+            })),
+          ],
+          temperature: 0.2, // Slightly higher to get diverse perspectives
+          max_tokens: 2048,
+        }),
+      });
+      if (!res.ok) throw new Error(`${model} failed: ${res.status}`);
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || "";
+    };
+
+    console.log("Council of AI: Querying GPT-4o, Gemini 2.5, and Claude 3 Haiku concurrently...");
+
+    // 1. Concurrent Multi-LLM Fetching
+    const [gptRes, geminiRes, claudeRes] = await Promise.allSettled([
+      fetchModel("openai/gpt-4o", fullSystemPrompt),
+      fetchModel("google/gemini-2.5-flash", fullSystemPrompt),
+      fetchModel("anthropic/claude-3-haiku", fullSystemPrompt),
+    ]);
+
+    const gptText = gptRes.status === "fulfilled" ? gptRes.value : "";
+    const geminiText = geminiRes.status === "fulfilled" ? geminiRes.value : "";
+    const claudeText = claudeRes.status === "fulfilled" ? claudeRes.value : "";
+
+    console.log(`Council Sub-agents finished. GPT:${gptText.length} | Gemini:${geminiText.length} | Claude:${claudeText.length}`);
+
+    // Fallback if all models failed
+    if (!gptText && !geminiText && !claudeText) {
+      throw new Error("All AI sub-agents failed to respond.");
+    }
+
+    // 2. Final Synthesizer Call
+    console.log("Synthesizing master response via GPT-4o...");
+
+    // The Synthesis Prompt
+    const synthesisSystemPrompt = `You are the Head Synthesizer for NextBull AI. 
+You have just received three different analysis reports from your elite sub-agents (ChatGPT, Gemini, and Claude) answering the user's latest query.
+
+YOUR JOB:
+1. Review the three perspectives below.
+2. Merge the best insights, most accurate technical levels, and sharpest reasoning into ONE ultimate, perfectly formatted answer.
+3. If the sub-agents disagree, use your best judgment to find the most logical consensus based on the LIVE MARKET DATA CONTEXT provided below.
+4. DO NOT mention "Agent A", "Gemini", "Claude", etc. Deliver the answer directly to the user as the unified "NextBull AI".
+5. Enforce the strict output formatting rules: use emojis, use bolding, give clear Entry/Target/Stop-Loss if it's a trade idea, and always provide a 🟢 Bullish and 🔴 Bearish probability weighting scenario.
+
+The original Live Market Data Context for this query has been provided below. You MUST use the exact numbers from this live data feed!
+
+${liveContext}
+
+═══ SUB-AGENT A (GPT) ═══
+${gptText || "(Failed to respond)"}
+
+═══ SUB-AGENT B (Gemini) ═══
+${geminiText || "(Failed to respond)"}
+
+═══ SUB-AGENT C (Claude) ═══
+${claudeText || "(Failed to respond)"}
+`;
+
+    const finalResponse = await fetch("https://api.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        // Using the smartest model for final synthesis
+        model: "openai/gpt-4o",
         messages: [
-          { role: "system", content: fullSystemPrompt },
-          ...messages.map((msg: { role: string; content: string }) => ({
-            role: msg.role,
-            content: msg.content,
-          })),
+          { role: "system", content: synthesisSystemPrompt },
+          ...messages.slice(-1) // Only need the final user question for context in the Synthesis step
         ],
-        temperature: 0.15,
-        max_tokens: 8192,
-        top_p: 0.85,
+        temperature: 0.1,
+        max_tokens: 4096,
       }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI Gateway error:", response.status, errorText);
-
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again shortly." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "API credits exhausted. Please add more credits." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      throw new Error(`AI Gateway error: ${response.status}`);
+    if (!finalResponse.ok) {
+      throw new Error(`Synthesis Gateway error: ${finalResponse.status}`);
     }
 
-    const data = await response.json();
-    const assistantMessage = data.choices?.[0]?.message?.content;
+    const finalData = await finalResponse.json();
+    const finalAssistantMessage = finalData.choices?.[0]?.message?.content;
 
-    console.log("Generated high-accuracy response with live market data");
+    console.log("Generated high-accuracy synthesized response via Multi-LLM Council.");
 
     return new Response(
-      JSON.stringify({ response: assistantMessage }),
+      JSON.stringify({ response: finalAssistantMessage }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

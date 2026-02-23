@@ -22,7 +22,7 @@ const Reports = lazy(() => import("./pages/Reports"));
 const About = lazy(() => import("./pages/About"));
 const Profile = lazy(() => import("./pages/Profile"));
 const ConnectBroker = lazy(() => import("./pages/ConnectBroker"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Markets = lazy(() => import("./pages/Markets"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Stable QueryClient instance — created outside component to avoid recreation on re-renders
@@ -53,7 +53,7 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Index />} />
-                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/markets" element={<Markets />} />
                 <Route path="/news" element={<News />} />
                 <Route path="/economic" element={<Economic />} />
                 <Route path="/research" element={<Research />} />

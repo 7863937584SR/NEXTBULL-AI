@@ -14,6 +14,7 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  Save,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -177,6 +178,34 @@ const Index = () => {
     }
   }, []);
 
+  // ── Save as Report ──
+  const saveAsReport = useCallback(async (content: string) => {
+    if (!user) {
+      toast({ title: 'Please log in', description: 'You need to be logged in to save reports.', variant: 'destructive' });
+      return;
+    }
+    try {
+      // Basic title generation from first line or generic
+      let title = "NextBull Financial Report";
+      const firstLine = content.split('\n')[0].replace(/[#*]/g, '').trim();
+      if (firstLine.length > 5 && firstLine.length < 50) {
+        title = firstLine;
+      }
+
+      const { error } = await supabase.from('saved_reports').insert({
+        user_id: user.id,
+        title,
+        content
+      });
+
+      if (error) throw error;
+      toast({ title: 'Report Saved', description: 'View it in the Reports section.' });
+    } catch (err: any) {
+      console.error('Failed to save report:', err);
+      toast({ title: 'Error', description: err.message || 'Failed to save report', variant: 'destructive' });
+    }
+  }, [user, toast]);
+
   // ── Delete conversation ──
   const deleteConversation = useCallback(async (id: string) => {
     try {
@@ -305,8 +334,8 @@ const Index = () => {
                 <div
                   key={conv.id}
                   className={`group flex items-start gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${activeConversationId === conv.id
-                      ? 'bg-primary/10 border border-primary/20'
-                      : 'hover:bg-secondary/50 border border-transparent'
+                    ? 'bg-primary/10 border border-primary/20'
+                    : 'hover:bg-secondary/50 border border-transparent'
                     }`}
                   onClick={() => loadMessages(conv.id)}
                 >
@@ -358,27 +387,38 @@ const Index = () => {
       <div className="flex-1 flex flex-col min-w-0">
         {messages.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8">
-            <h1 className="text-4xl font-bold text-foreground mb-12">
-              What can I help with?
-            </h1>
-
-            <div className="w-full max-w-2xl mb-6">
-              <ChatInputBar
-                input={input}
-                setInput={setInput}
-                onSubmit={handleSubmit}
-                isLoading={isLoading}
-                placeholder="Ask NextBull GPT about markets, stocks, analysis..."
-              />
+            <div className="mb-10 text-center flex flex-col items-center">
+              <div className="relative mb-6">
+                <div className="absolute -inset-1 bg-gradient-to-tr from-emerald-500 to-teal-500 rounded-2xl blur-md opacity-40 animate-pulse" />
+                <img src="/nextbull-logo.jpg" alt="NextBull" className="relative w-16 h-16 rounded-2xl object-cover ring-1 ring-white/20 shadow-2xl" />
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-3">
+                Ask <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent">NextBull AI</span>
+              </h1>
+              <p className="text-muted-foreground text-lg">Your intelligent market companion</p>
             </div>
 
-            <div className="flex flex-wrap gap-3 justify-center">
+            <div className="w-full max-w-2xl mb-8 relative">
+              <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 rounded-3xl blur opacity-50" />
+              <div className="relative">
+                <ChatInputBar
+                  input={input}
+                  setInput={setInput}
+                  onSubmit={handleSubmit}
+                  isLoading={isLoading}
+                  placeholder="Ask NextBull AI about markets, stocks, analysis..."
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3 justify-center max-w-3xl">
               {quickActions.map((action) => (
                 <Button
                   key={action.label}
                   variant="chat"
                   onClick={() => sendMessage(action.prompt)}
                   disabled={isLoading}
+                  className="bg-secondary/40 border border-border/50 hover:border-emerald-500/50 hover:bg-emerald-500/10 hover:text-emerald-400 transition-all rounded-xl"
                 >
                   {action.label}
                 </Button>
@@ -401,13 +441,46 @@ const Index = () => {
                         }`}
                     >
                       <p className="whitespace-pre-wrap">{message.content}</p>
+                      {message.role === 'assistant' && (
+                        <div className="mt-3 flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => saveAsReport(message.content)}
+                            className="h-7 text-[10px] gap-1.5 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-400"
+                          >
+                            <Save className="w-3 h-3" />
+                            Save as Report
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
                 {isLoading && (
                   <div className="flex justify-start">
-                    <div className="bg-secondary rounded-2xl px-4 py-3">
-                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    <div className="bg-secondary rounded-2xl px-5 py-4 min-w-[300px] border border-emerald-500/20 shadow-sm relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-emerald-500/5 to-transparent flex translate-x-[-100%] animate-[shimmer_2s_infinite]" />
+                      <div className="flex flex-col gap-3 relative z-10">
+                        <div className="flex items-center gap-2.5">
+                          <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                          <span className="text-sm font-semibold text-foreground">NextBull AI Council is analyzing...</span>
+                        </div>
+                        <div className="space-y-2 pl-6">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Fetching authoritative live market data...
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse" style={{ animationDelay: '1s' }}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+                            Querying GPT-4, Gemini Flash, & Claude Haiku...
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse" style={{ animationDelay: '2.5s' }}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
+                            Synthesizing master response...
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

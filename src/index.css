@@ -127,28 +127,32 @@
    KEYFRAME ANIMATIONS
    ═══════════════════════════════════════════════════════════ */
 
-/* Fade up — page sections */
-@keyframes fade-up {
+/* Slide from left — sidebar */
+@keyframes slide-in-left {
   from {
     opacity: 0;
-    transform: translateY(24px);
+    transform: translateX(-20px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(0);
   }
 }
 
-/* Fade in — general */
-@keyframes fade-in {
-  from {
-    opacity: 0;
+/* Marquee Scroll */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
   }
 
-  to {
-    opacity: 1;
+  100% {
+    transform: translateX(-50%);
   }
+}
+
+.animate-marquee {
+  animation: marquee 20s linear infinite;
 }
 
 /* Scale in — modals and cards */
