@@ -251,6 +251,22 @@ const FOREX_HEATMAP_CONFIG = {
     currencies: ['EUR', 'USD', 'JPY', 'GBP', 'CHF', 'AUD', 'CAD', 'NZD', 'INR'],
 };
 
+const HEATMAP_CRYPTO = {
+    dataSource: "Crypto",
+    blockSize: "market_cap_calc",
+    blockColor: "change",
+    locale: "en",
+    symbolUrl: "",
+    colorTheme: "dark",
+    hasTopBar: true,
+    isDataSetEnabled: false,
+    isZoomEnabled: true,
+    hasSymbolTooltip: true,
+    isMonoSize: false,
+    width: "100%",
+    height: "500"
+};
+
 const HEATMAP_SENSEX = {
     exchanges: [], dataSource: 'SENSEX', grouping: 'sector', blockSize: 'market_cap_basic',
     blockColor: 'change', locale: 'en', symbolUrl: '', colorTheme: 'dark', hasTopBar: true,
@@ -314,14 +330,14 @@ export const MarketHeatmaps = memo(() => {
                 </SectionCard>
 
                 <SectionCard
-                    title="Forex Heatmap"
-                    subtitle="Live · Currency strength visualization"
-                    icon={DollarSign}
-                    gradientFrom="from-purple-500/20 to-pink-500/10"
-                    gradientVia="ring-purple-500/20"
-                    borderVia="via-purple-500/60"
+                    title="Crypto Heatmap"
+                    subtitle="Live · Top Cryptocurrencies by Market Cap"
+                    icon={Bitcoin}
+                    gradientFrom="from-orange-500/20 to-amber-500/10"
+                    gradientVia="ring-orange-500/20"
+                    borderVia="via-orange-500/60"
                 >
-                    <LazyWidget src={TV + 'forex-heat-map.js'} config={FOREX_HEATMAP_CONFIG} height={450} />
+                    <LazyWidget src={TV + 'crypto-coins-heatmap.js'} config={HEATMAP_CRYPTO} height={450} />
                 </SectionCard>
             </div>
 
@@ -354,12 +370,39 @@ export const MarketHeatmaps = memo(() => {
 MarketHeatmaps.displayName = 'MarketHeatmaps';
 
 const GlobalMarketsWidget = memo(({ hideDetailedTabs = false }: { hideDetailedTabs?: boolean }) => {
-    return (
-        <div className="space-y-4">
-            {/* ════════ INDIAN MARKETS ════════ */}
+    // Determine which markets are currently open to prioritize them in the UI
+    const [marketOrder, setMarketOrder] = useState<('indian' | 'global' | 'crypto')[]>(['indian', 'global', 'crypto']);
+
+    useEffect(() => {
+        const now = new Date();
+        const utcHours = now.getUTCHours() + now.getUTCMinutes() / 60;
+        const day = now.getUTCDay(); // 0 is Sunday, 6 is Saturday
+
+        const isWeekday = day >= 1 && day <= 5;
+
+        // India: 09:15 to 15:30 IST -> 03:45 to 10:00 UTC
+        const isIndianOpen = isWeekday && utcHours >= 3.75 && utcHours <= 10.0;
+
+        // US: 09:30 to 16:00 EST/EDT -> ~13:30 to 21:00 UTC (pad boundaries)
+        const isUsOpen = isWeekday && utcHours >= 13.5 && utcHours <= 21.0;
+
+        if (isUsOpen && !isIndianOpen) {
+            setMarketOrder(['global', 'indian', 'crypto']);
+        } else if (!isUsOpen && !isIndianOpen) {
+            // Both closed (e.g. weekends or late night), put 24/7 Crypto at the top
+            setMarketOrder(['crypto', 'global', 'indian']);
+        } else {
+            // Indian is open, default to Indian first
+            setMarketOrder(['indian', 'global', 'crypto']);
+        }
+    }, []);
+
+    const sections = {
+        indian: (
             <SectionCard
+                key="indian"
                 title="Indian Markets"
-                subtitle="Real-time · NIFTY, SENSEX, Sectoral, Large Cap, MCX"
+                subtitle="Live Indian Session · NIFTY, SENSEX, Sectoral, Large Cap"
                 icon={IndianRupee}
                 gradientFrom="from-teal-500/20 to-emerald-500/10"
                 gradientVia="ring-teal-500/20"
@@ -367,11 +410,12 @@ const GlobalMarketsWidget = memo(({ hideDetailedTabs = false }: { hideDetailedTa
             >
                 <LazyWidget src={TV + 'market-overview.js'} config={INDIAN_CONFIG} />
             </SectionCard>
-
-            {/* ════════ GLOBAL MARKETS ════════ */}
+        ),
+        global: (
             <SectionCard
+                key="global"
                 title="Global Markets"
-                subtitle="Real-time · US, Europe, Asia, Commodities"
+                subtitle="Live Global Session · US, Europe, Asia, Commodities"
                 icon={Globe}
                 gradientFrom="from-blue-500/20 to-cyan-500/10"
                 gradientVia="ring-blue-500/20"
@@ -379,11 +423,12 @@ const GlobalMarketsWidget = memo(({ hideDetailedTabs = false }: { hideDetailedTa
             >
                 <LazyWidget src={TV + 'market-overview.js'} config={GLOBAL_CONFIG} />
             </SectionCard>
-
-            {/* ════════ CRYPTO MARKETS ════════ */}
+        ),
+        crypto: (
             <SectionCard
+                key="crypto"
                 title="Cryptocurrency Markets"
-                subtitle="Real-time · Bitcoin, Ethereum, DeFi, Meme Coins, 18+ tokens"
+                subtitle="Live 24/7 · Bitcoin, Ethereum, DeFi, Meme Coins"
                 icon={Bitcoin}
                 gradientFrom="from-orange-500/20 to-amber-500/10"
                 gradientVia="ring-orange-500/20"
@@ -391,6 +436,12 @@ const GlobalMarketsWidget = memo(({ hideDetailedTabs = false }: { hideDetailedTa
             >
                 <LazyWidget src={TV + 'market-overview.js'} config={CRYPTO_CONFIG} />
             </SectionCard>
+        )
+    };
+
+    return (
+        <div className="space-y-4">
+            {marketOrder.map(key => sections[key])}
 
             {!hideDetailedTabs && (
                 <>

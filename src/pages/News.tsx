@@ -40,6 +40,18 @@ const SOURCE_COLORS: Record<string, string> = {
   'MoneyControl': 'text-emerald-400',
   'Economic Times': 'text-orange-400',
   'LiveMint': 'text-rose-400',
+  'Business Standard': 'text-amber-500',
+  'Hindu BusinessLine': 'text-indigo-400',
+  'CNBC': 'text-blue-500',
+  'BBC Business': 'text-red-400',
+  'Wall Street Journal': 'text-slate-400',
+  'Yahoo Finance': 'text-purple-400',
+  'MarketWatch': 'text-green-500',
+  'Reuters': 'text-orange-500',
+  'Financial Times': 'text-pink-400',
+  'Bloomberg': 'text-blue-400',
+  'Zee Business': 'text-red-500',
+  'NDTV Profit': 'text-indigo-400',
   'r/IndianStockMarket': 'text-orange-500',
   'r/wallstreetbets': 'text-yellow-400',
   'r/stocks': 'text-cyan-400',
@@ -85,9 +97,16 @@ async function fetchReddit(subreddit: string, category: string, limit = 8): Prom
 // ── Fetch RSS via rss2json (free CORS proxy) ──
 async function fetchRSS(rssUrl: string, source: string, category: string, maxItems = 8): Promise<NewsItem[]> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     const res = await fetch(
-      `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=${maxItems}`
+      `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=${maxItems}`,
+      { signal: controller.signal }
     );
+
+    clearTimeout(timeoutId);
+
     if (!res.ok) return [];
     const data = await res.json();
     if (data.status !== 'ok') return [];
@@ -101,10 +120,11 @@ async function fetchRSS(rssUrl: string, source: string, category: string, maxIte
       publishedAt: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
     }));
   } catch (e) {
-    console.warn(`RSS ${source} fetch failed:`, e);
+    console.warn(`RSS ${source} fetch failed or timed out:`, e);
     return [];
   }
 }
+
 
 const News = () => {
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -157,6 +177,50 @@ const News = () => {
         fetchRSS(
           'https://www.livemint.com/rss/markets',
           'LiveMint', 'indian', 6
+        ),
+        fetchRSS(
+          'https://www.business-standard.com/rss/markets-106.rss',
+          'Business Standard', 'indian', 6
+        ),
+        fetchRSS(
+          'https://www.thehindubusinessline.com/markets/feeder/default.rss',
+          'Hindu BusinessLine', 'indian', 6
+        ),
+        fetchRSS(
+          'https://search.cnbc.com/rs/search/combinedcms/view.xml?id=10000664',
+          'CNBC', 'global', 6
+        ),
+        fetchRSS(
+          'https://feeds.bbci.co.uk/news/business/rss.xml',
+          'BBC Business', 'global', 6
+        ),
+        fetchRSS(
+          'https://feeds.a.dj.com/rss/RSSMarketsMain.xml',
+          'Wall Street Journal', 'global', 6
+        ),
+        fetchRSS(
+          'https://finance.yahoo.com/news/rssindex',
+          'Yahoo Finance', 'global', 6
+        ),
+        fetchRSS(
+          'https://news.google.com/rss/search?q=finance+stock+market+when:1d+source:reuters&hl=en-US&gl=US&ceid=US:en',
+          'Reuters', 'global', 6
+        ),
+        fetchRSS(
+          'https://news.google.com/rss/search?q=markets+finance+when:1d+source:bloomberg&hl=en-US&gl=US&ceid=US:en',
+          'Bloomberg', 'global', 6
+        ),
+        fetchRSS(
+          'https://news.google.com/rss/search?q=finance+markets+when:1d+source:"Financial+Times"&hl=en-US&gl=US&ceid=US:en',
+          'Financial Times', 'global', 4
+        ),
+        fetchRSS(
+          'https://www.zeebiz.com/latest-news/rssfeed.xml',
+          'Zee Business', 'indian', 6
+        ),
+        fetchRSS(
+          'https://news.google.com/rss/search?q=markets+when:1d+source:"NDTV+Profit"&hl=en-IN&gl=IN&ceid=IN:en',
+          'NDTV Profit', 'indian', 5
         ),
         fetchReddit('IndianStockMarket', 'indian', 8),
         fetchReddit('wallstreetbets', 'global', 6),
@@ -313,13 +377,13 @@ const News = () => {
             );
           })}
         </div>
-        <div className="relative w-full sm:w-56">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+        <div className="relative w-full transition-all duration-300 sm:w-56 focus-within:sm:w-64 group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input
             placeholder="Search news..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-8 text-xs bg-secondary/50 border-border/50"
+            className="pl-9 h-8 text-xs bg-secondary/50 border-border/50 transition-all duration-300 focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:border-primary/50 hover:bg-secondary/70 focus-visible:bg-secondary/70 focus-visible:shadow-[0_0_15px_rgba(59,130,246,0.15)]"
           />
         </div>
       </div>
@@ -438,7 +502,7 @@ const News = () => {
 
       {/* ── FOOTER ── */}
       <div className="text-center text-[10px] text-muted-foreground/60 pt-4 border-t border-border/20">
-        Aggregated from Google News, MoneyControl, Economic Times, LiveMint, Reddit, TradingView · Auto-refreshes every 5 minutes
+        Aggregated from Bloomberg, Reuters, Financial Times, Yahoo Finance, Google News, MoneyControl, Economic Times, LiveMint, Business Standard, Hindu BusinessLine, CNBC, BBC, WSJ, Zee Business, NDTV Profit, Reddit, TradingView · Auto-refreshes every 5 minutes
       </div>
     </div>
   );

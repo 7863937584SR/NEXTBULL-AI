@@ -29,9 +29,9 @@ export function StockSearchModal({ isOpen, onClose, symbol }: StockSearchModalPr
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-[1200px] w-[95vw] h-[85vh] p-0 bg-background/95 border-border/50 backdrop-blur-xl overflow-hidden shadow-2xl">
+            <DialogContent className="max-w-none w-screen h-screen m-0 p-0 bg-background border-none rounded-none overflow-hidden flex flex-col shadow-none">
                 {/* Custom Header for the Modal */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-border/40 bg-card/40">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-border/40 bg-background/95 backdrop-blur shrink-0 pr-12">
                     <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
                             <span className="text-emerald-500 font-bold text-xs tabular-nums">TV</span>
@@ -49,7 +49,7 @@ export function StockSearchModal({ isOpen, onClose, symbol }: StockSearchModalPr
                 </div>
 
                 {/* Chart Area */}
-                <div className="w-full h-[calc(100%-80px)] p-4 relative bg-card/20">
+                <div className="w-full flex-1 relative bg-background">
                     {formattedSymbol ? (
                         <TVLazyWidget
                             // Crucial: use key to force unmount/remount when symbol changes while modal is open
@@ -66,13 +66,14 @@ export function StockSearchModal({ isOpen, onClose, symbol }: StockSearchModalPr
                                 style: "1",
                                 locale: "in",
                                 enable_publishing: false,
-                                backgroundColor: "rgba(13, 15, 20, 0)", // Transparent background
+                                backgroundColor: "rgba(10, 10, 14, 1)", // Match dark theme
                                 gridColor: "rgba(42, 46, 57, 0.3)",
                                 hide_top_toolbar: false,
+                                hide_side_toolbar: false,
                                 hide_legend: false,
-                                save_image: true,
+                                save_image: false,
                                 hide_volume: false,
-                                allow_symbol_change: true,
+                                allow_symbol_change: false,
                                 studies: [
                                     "Volume@tv-basicstudies",
                                     "MASimple@tv-basicstudies"

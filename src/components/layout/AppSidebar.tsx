@@ -128,8 +128,8 @@ export const AppSidebar = ({ isOpen, onClose }: AppSidebarProps) => {
 
           <NavLink to="/" className="flex flex-col items-center gap-4 relative z-10 hover:opacity-90 transition-opacity" onClick={onClose}>
             <div className="relative group">
-              <div className="absolute -inset-2 bg-gradient-to-tr from-emerald-500 to-teal-500 rounded-2xl blur-md opacity-40 group-hover:opacity-70 transition-opacity animate-pulse" />
-              <img src="/nextbull-logo.jpg" alt="NextBull" className="relative w-16 h-16 rounded-2xl object-cover ring-2 ring-white/10 shadow-xl" />
+              <div className="absolute -inset-2 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-full blur-md opacity-40 group-hover:opacity-70 transition-opacity animate-pulse" />
+              <img src="/nextbull-logo.jpg" alt="NextBull" className="relative w-16 h-16 rounded-full object-cover ring-2 ring-white/10 shadow-[0_0_20px_theme(colors.blue.600/30)]" />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xl font-black tracking-tight bg-gradient-to-r from-white to-white/90 bg-clip-text text-transparent leading-none">

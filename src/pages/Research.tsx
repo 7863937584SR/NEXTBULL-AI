@@ -274,8 +274,8 @@ const Research = () => {
                 key={cat.key}
                 onClick={() => setActiveCategory(cat.key)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${activeCategory === cat.key
-                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                    : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                  : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground'
                   }`}
               >
                 <Icon className="w-3 h-3" />
@@ -287,13 +287,13 @@ const Research = () => {
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
           {/* Search */}
-          <div className="relative flex-1 sm:w-56">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <div className="relative flex-1 transition-all duration-300 sm:w-56 focus-within:sm:w-64 group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input
               placeholder="Search research..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-8 text-xs bg-secondary/50 border-border/50"
+              className="pl-9 h-8 text-xs bg-secondary/50 border-border/50 transition-all duration-300 focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:border-primary/50 hover:bg-secondary/70 focus-visible:bg-secondary/70 focus-visible:shadow-[0_0_15px_rgba(59,130,246,0.15)]"
             />
           </div>
           {/* View mode toggle */}
@@ -326,76 +326,123 @@ const Research = () => {
 
       {/* ── ARTICLES ── */}
       {viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredItems.map((item) => {
             const colors = CATEGORY_COLORS[item.category];
+            // Extract a pure color string for glow based on the tailwind mapped colors
+            const getHexGlow = (cat: string) => {
+              if (cat === 'fundamental') return 'rgba(59,130,246,0.3)'; // blue
+              if (cat === 'technical') return 'rgba(168,85,247,0.3)'; // purple
+              if (cat === 'sector') return 'rgba(16,185,129,0.3)'; // emerald
+              if (cat === 'macro') return 'rgba(245,158,11,0.3)'; // amber
+              if (cat === 'strategy') return 'rgba(244,63,94,0.3)'; // rose
+              return 'rgba(6,182,212,0.3)'; // cyan
+            }
+
             return (
-              <Card
-                key={item.id}
-                className="bg-card/70 border-border/40 hover:border-primary/30 backdrop-blur-sm transition-all duration-200 cursor-pointer group overflow-hidden relative"
-              >
-                {/* Top accent line */}
-                <div className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r ${GRADIENT_MAP[item.category].replace('via-transparent to-transparent', 'to-transparent')}`} />
-                <CardContent className="p-5 flex flex-col h-full">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Badge variant="outline" className={`${colors.bg} ${colors.text} border-0 text-[10px] font-semibold`}>
-                      {item.tag}
-                    </Badge>
-                  </div>
-                  <h3 className="text-base font-bold text-foreground mb-2 group-hover:text-primary transition-colors leading-snug line-clamp-2">
-                    {item.title}
-                  </h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 mb-4 flex-1">
-                    {item.description}
-                  </p>
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-auto pt-3 border-t border-border/30">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" /> {item.date}
-                    </span>
-                    <span>{item.readTime}</span>
-                  </div>
-                </CardContent>
-              </Card>
+              <div key={item.id} className="relative group perspective-1000 cursor-pointer h-full">
+                {/* Expand out background glow */}
+                <div
+                  className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 blur-xl transition-all duration-500 will-change-transform"
+                  style={{ background: getHexGlow(item.category) }}
+                />
+
+                <Card className="relative h-full bg-[#1e222d]/80 border-white/5 backdrop-blur-xl transition-all duration-300 overflow-hidden rounded-2xl group-hover:-translate-y-1 group-hover:border-white/10 group-hover:shadow-2xl">
+                  {/* Subtle Background Glow inside card */}
+                  <div
+                    className="absolute inset-0 opacity-10 group-hover:opacity-30 transition-opacity duration-500"
+                    style={{ background: `radial-gradient(circle at top right, ${getHexGlow(item.category)}, transparent 60%)` }}
+                  />
+
+                  {/* Top vibrant accent line */}
+                  <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${GRADIENT_MAP[item.category].replace('via-transparent to-transparent', 'to-transparent')} shadow-[0_0_15px_currentColor]`} />
+
+                  <CardContent className="p-6 flex flex-col h-full relative z-10">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Badge variant="outline" className={`${colors.bg} ${colors.text} border-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 shadow-inner`}>
+                        {item.tag}
+                      </Badge>
+                    </div>
+
+                    <h3 className="text-lg font-bold text-gray-100 mb-3 group-hover:text-white transition-colors leading-snug line-clamp-2 drop-shadow-sm">
+                      {item.title}
+                    </h3>
+
+                    <p className="text-sm text-gray-400 leading-relaxed line-clamp-3 mb-6 flex-1">
+                      {item.description}
+                    </p>
+
+                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/5">
+                      <span className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+                        <Calendar className="w-3.5 h-3.5" /> {item.date}
+                      </span>
+                      <span className="text-xs text-gray-500 font-medium">{item.readTime}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             );
           })}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {filteredItems.map((item) => {
             const colors = CATEGORY_COLORS[item.category];
+            const getHexGlow = (cat: string) => {
+              if (cat === 'fundamental') return 'rgba(59,130,246,0.3)';
+              if (cat === 'technical') return 'rgba(168,85,247,0.3)';
+              if (cat === 'sector') return 'rgba(16,185,129,0.3)';
+              if (cat === 'macro') return 'rgba(245,158,11,0.3)';
+              if (cat === 'strategy') return 'rgba(244,63,94,0.3)';
+              return 'rgba(6,182,212,0.3)';
+            }
+
             return (
-              <Card
-                key={item.id}
-                className="bg-card/70 border-border/40 hover:border-primary/30 backdrop-blur-sm transition-all duration-200 cursor-pointer group"
-              >
-                <CardContent className="p-5 flex flex-col sm:flex-row gap-4">
-                  {/* Left meta */}
-                  <div className="flex sm:flex-col items-center sm:items-start gap-2 sm:w-32 flex-shrink-0">
-                    <Badge variant="outline" className={`${colors.bg} ${colors.text} border-0 text-[10px] font-semibold`}>
-                      {item.tag}
-                    </Badge>
-                    <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                      <Calendar className="w-3 h-3" /> {item.date}
-                    </span>
-                  </div>
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-bold text-foreground group-hover:text-primary transition-colors leading-snug mb-1">
-                      {item.title}
-                    </h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
-                      {item.description}
-                    </p>
-                  </div>
-                  {/* Right meta */}
-                  <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:w-24 flex-shrink-0 text-[11px] text-muted-foreground">
-                    <span>{item.readTime}</span>
-                    <span className="text-primary text-xs font-semibold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      Read <ArrowRight className="w-3 h-3" />
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+              <div key={item.id} className="relative group perspective-1000 cursor-pointer">
+                <div
+                  className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 blur-xl transition-all duration-500 will-change-transform"
+                  style={{ background: getHexGlow(item.category) }}
+                />
+
+                <Card className="relative bg-[#1e222d]/80 border-white/5 backdrop-blur-xl transition-all duration-300 overflow-hidden rounded-2xl group-hover:-translate-y-1 group-hover:border-white/10 group-hover:shadow-2xl">
+                  <div
+                    className="absolute inset-0 opacity-10 group-hover:opacity-30 transition-opacity duration-500"
+                    style={{ background: `radial-gradient(circle at left, ${getHexGlow(item.category)}, transparent 40%)` }}
+                  />
+
+                  <div className={`absolute top-0 bottom-0 left-0 w-1.5 bg-gradient-to-b ${GRADIENT_MAP[item.category].replace('via-transparent to-transparent', 'to-transparent')} shadow-[0_0_15px_currentColor]`} />
+
+                  <CardContent className="p-5 pl-7 flex flex-col sm:flex-row items-center gap-6 relative z-10">
+                    {/* Left meta */}
+                    <div className="flex sm:flex-col items-center sm:items-start gap-3 flex-shrink-0 w-full sm:w-36">
+                      <Badge variant="outline" className={`${colors.bg} ${colors.text} border-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 shadow-inner`}>
+                        {item.tag}
+                      </Badge>
+                      <span className="text-[11px] text-gray-500 font-medium flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-gray-400" /> {item.date}
+                      </span>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base font-bold text-gray-100 group-hover:text-white transition-colors leading-snug mb-2 drop-shadow-sm">
+                        {item.title}
+                      </h3>
+                      <p className="text-sm text-gray-400 leading-relaxed line-clamp-2">
+                        {item.description}
+                      </p>
+                    </div>
+
+                    {/* Right meta */}
+                    <div className="flex sm:flex-col items-center sm:items-end gap-3 flex-shrink-0 text-xs font-medium text-gray-500 w-full sm:w-28 mt-4 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-t-0 border-white/5 sm:border-l sm:pl-6">
+                      <span>{item.readTime}</span>
+                      <span className={`text-xs font-bold flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1 ${colors.text}`}>
+                        Read <ArrowRight className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             );
           })}
         </div>

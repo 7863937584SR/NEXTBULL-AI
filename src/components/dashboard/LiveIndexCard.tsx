@@ -57,55 +57,72 @@ export function LiveIndexCard({ indexName, refreshInterval = 5000 }: LiveIndexCa
 
     return (
         <Card className={cn(
-            "h-[140px] p-5 flex flex-col justify-between overflow-hidden relative group transition-all duration-300",
-            "bg-card/60 border-border/50 hover:bg-card/80 hover:border-border/80",
-            // Subtle glowing border effect based on market direction
-            isPositive ? "hover:shadow-[0_0_15px_-3px_rgba(16,185,129,0.15)] hover:border-emerald-500/30"
-                : "hover:shadow-[0_0_15px_-3px_rgba(239,68,68,0.15)] hover:border-red-500/30"
+            "h-[150px] p-5 flex flex-col justify-between overflow-hidden relative group transition-all duration-500 cursor-default",
+            "bg-gradient-to-br from-[#121622] to-[#0A0D15] border-border/40 hover:-translate-y-1",
+            isPositive
+                ? "hover:shadow-[0_10px_40px_-10px_rgba(16,185,129,0.3)] hover:border-emerald-500/50 ring-1 ring-inset ring-transparent hover:ring-emerald-500/20"
+                : "hover:shadow-[0_10px_40px_-10px_rgba(239,68,68,0.3)] hover:border-red-500/50 ring-1 ring-inset ring-transparent hover:ring-red-500/20"
         )}>
+            {/* Background Animated Gradient Glow */}
+            <div className={cn(
+                "absolute -top-12 -right-12 w-40 h-40 rounded-full blur-[40px] opacity-10 transition-opacity duration-700 group-hover:opacity-30",
+                isPositive ? "bg-emerald-500" : "bg-red-500"
+            )} />
+
             {/* Background Grain/Texture (subtle) */}
-            <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, #ffffff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+            <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, #ffffff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
 
             <div className="flex justify-between items-start relative z-10">
-                <h3 className="text-sm font-bold tracking-tight text-foreground/90 uppercase">{indexData.index}</h3>
+                <h3 className="text-[13px] font-black tracking-wider text-foreground/80 uppercase">
+                    {indexData.index}
+                </h3>
                 <div className={cn(
-                    "w-7 h-7 rounded-full flex items-center justify-center transition-colors",
-                    isPositive ? "bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20"
-                        : "bg-red-500/10 text-red-500 group-hover:bg-red-500/20"
+                    "w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-500 shadow-sm",
+                    isPositive
+                        ? "bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                        : "bg-red-500/10 text-red-500 group-hover:bg-red-500/20 group-hover:shadow-[0_0_15px_rgba(239,68,68,0.2)]"
                 )}>
                     <Activity className="w-4 h-4" />
                 </div>
             </div>
 
-            <div className="relative z-10 flex flex-col gap-1">
+            <div className="relative z-10 flex flex-col gap-1.5 mt-2">
                 <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-black tracking-tighter tabular-nums drop-shadow-sm">
+                    <span className={cn(
+                        "text-3xl font-black tracking-tighter tabular-nums drop-shadow-md transition-colors",
+                        isPositive ? "text-emerald-400 group-hover:text-emerald-400" : "text-red-400 group-hover:text-red-400"
+                    )}>
                         {indexData.last.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                 </div>
 
                 <div className={cn(
-                    "flex items-center text-xs font-bold font-mono tracking-tight",
+                    "flex items-center text-[13px] font-bold font-mono tracking-tight",
                     isPositive ? "text-emerald-500" : "text-red-500"
                 )}>
-                    {isPositive ? <ArrowUpIcon className="w-3.5 h-3.5 mr-1" strokeWidth={3} /> : <ArrowDownIcon className="w-3.5 h-3.5 mr-1" strokeWidth={3} />}
+                    {isPositive ? <ArrowUpIcon className="w-4 h-4 mr-0.5" strokeWidth={3.5} /> : <ArrowDownIcon className="w-4 h-4 mr-0.5" strokeWidth={3.5} />}
                     <span className="tabular-nums drop-shadow-sm">
                         {Math.abs(indexData.variation).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
-                    <span className="mx-1.5 opacity-50 font-sans">•</span>
-                    <span className="tabular-nums drop-shadow-sm bg-background/50 px-1.5 py-0.5 rounded-md border border-current/10">
+                    <span className="mx-2 opacity-30 font-sans">•</span>
+                    <span className={cn(
+                        "tabular-nums px-2 py-0.5 rounded-md border shadow-sm transition-colors",
+                        isPositive
+                            ? "bg-emerald-500/10 border-emerald-500/20 group-hover:bg-emerald-500/20 group-hover:border-emerald-500/30"
+                            : "bg-red-500/10 border-red-500/20 group-hover:bg-red-500/20 group-hover:border-red-500/30"
+                    )}>
                         {Math.abs(indexData.percentChange).toFixed(2)}%
                     </span>
                 </div>
             </div>
 
             {/* Live Indicator Dot */}
-            <div className="absolute bottom-4 right-4 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute bottom-4 right-4 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", isPositive ? "bg-emerald-400" : "bg-red-400")}></span>
+                    <span className={cn("relative inline-flex rounded-full h-2 w-2", isPositive ? "bg-emerald-500" : "bg-red-500")}></span>
                 </span>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-500/80">Live</span>
+                <span className={cn("text-[9px] font-black uppercase tracking-widest", isPositive ? "text-emerald-500/80" : "text-red-500/80")}>Live</span>
             </div>
         </Card>
     );

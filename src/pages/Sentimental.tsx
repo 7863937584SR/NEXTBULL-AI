@@ -181,66 +181,6 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(s / 86400)}d`;
 }
 
-// ── HEATMAP SUB-COMPONENTS ──
-const NiftyHeatmap = ({ containerRef }: { containerRef: React.RefObject<HTMLDivElement> }) => {
-  useEffect(() => {
-    if (!containerRef.current) return;
-    containerRef.current.innerHTML = '';
-    const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js';
-    script.type = 'text/javascript';
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      exchanges: [],
-      dataSource: 'SENSEX',
-      grouping: 'sector',
-      blockSize: 'market_cap_basic',
-      blockColor: 'change',
-      locale: 'en',
-      symbolUrl: '',
-      colorTheme: 'dark',
-      hasTopBar: true,
-      isDataSetEnabled: false,
-      isZoomEnabled: true,
-      hasSymbolTooltip: true,
-      isMonoSize: false,
-      width: '100%',
-      height: '450',
-    });
-    containerRef.current.appendChild(script);
-  }, []);
-  return <div ref={containerRef} className="tradingview-widget-container" />;
-};
-
-const GlobalHeatmap = ({ containerRef }: { containerRef: React.RefObject<HTMLDivElement> }) => {
-  useEffect(() => {
-    if (!containerRef.current) return;
-    containerRef.current.innerHTML = '';
-    const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js';
-    script.type = 'text/javascript';
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      exchanges: [],
-      dataSource: 'SPX500',
-      grouping: 'sector',
-      blockSize: 'market_cap_basic',
-      blockColor: 'change',
-      locale: 'en',
-      symbolUrl: '',
-      colorTheme: 'dark',
-      hasTopBar: true,
-      isDataSetEnabled: false,
-      isZoomEnabled: true,
-      hasSymbolTooltip: true,
-      isMonoSize: false,
-      width: '100%',
-      height: '450',
-    });
-    containerRef.current.appendChild(script);
-  }, []);
-  return <div ref={containerRef} className="tradingview-widget-container" />;
-};
 
 // ── MAIN COMPONENT ──
 const Sentimental = () => {
@@ -249,8 +189,6 @@ const Sentimental = () => {
   const [redditPosts, setRedditPosts] = useState<RedditPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const niftyHeatmapRef = useRef<HTMLDivElement>(null);
-  const globalHeatmapRef = useRef<HTMLDivElement>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -550,51 +488,7 @@ const Sentimental = () => {
         </Card>
       )}
 
-      {/* ── MARKET HEATMAPS ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* NIFTY 50 Heatmap */}
-        <Card className="bg-card/80 border-border/50 backdrop-blur-sm overflow-hidden relative hover-glow">
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-teal-500/60 to-transparent" />
-          <CardHeader className="pb-2 pt-4 px-5">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-teal-500/20 to-emerald-500/10 ring-1 ring-teal-500/20">
-                <Map className="w-4 h-4 text-teal-400" />
-              </div>
-              <div>
-                <CardTitle className="text-sm font-bold">NIFTY 50 Heatmap</CardTitle>
-                <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                  Sector-wise · By market cap
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0 pt-1">
-            <NiftyHeatmap containerRef={niftyHeatmapRef} />
-          </CardContent>
-        </Card>
 
-        {/* Global Market Heatmap */}
-        <Card className="bg-card/80 border-border/50 backdrop-blur-sm overflow-hidden relative hover-glow">
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-blue-500/60 to-transparent" />
-          <CardHeader className="pb-2 pt-4 px-5">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/10 ring-1 ring-blue-500/20">
-                <Globe className="w-4 h-4 text-blue-400" />
-              </div>
-              <div>
-                <CardTitle className="text-sm font-bold">S&P 500 Heatmap</CardTitle>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  Global sentiment · US large-cap stocks
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0 pt-1">
-            <GlobalHeatmap containerRef={globalHeatmapRef} />
-          </CardContent>
-        </Card>
-      </div>
 
       {/* ── FOOTER ── */}
       <p className="text-[10px] text-muted-foreground/50 text-center">

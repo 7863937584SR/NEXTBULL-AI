@@ -76,8 +76,8 @@ export const AppHeader = ({ onToggleSidebar }: AppHeaderProps) => {
           {/* Mobile Title (Shows when search isn't focused/used, or always next to it if space permits) */}
           <div className="lg:hidden absolute left-1/2 -translate-x-1/2 sm:static sm:translate-x-0 hidden sm:flex items-center gap-2 mr-4">
             <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-tr from-emerald-500 to-teal-500 rounded-lg blur opacity-50 animate-pulse" />
-              <img src="/nextbull-logo.jpg" alt="NextBull" className="relative w-6 h-6 rounded-lg object-cover ring-1 ring-white/10" />
+              <div className="absolute -inset-1 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-full blur opacity-60 animate-pulse" />
+              <img src="/nextbull-logo.jpg" alt="NextBull" className="relative w-6 h-6 rounded-full object-cover ring-1 ring-white/10" />
             </div>
           </div>
 
@@ -87,7 +87,7 @@ export const AppHeader = ({ onToggleSidebar }: AppHeaderProps) => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search stocks, crypto, indices... (e.g., RELIANCE, AAPL)"
-              className="w-full pl-9 bg-secondary/30 border-border/50 focus-visible:ring-emerald-500/30 focus-visible:border-emerald-500/50 rounded-full h-9 text-xs sm:text-sm placeholder:text-muted-foreground/70 transition-all"
+              className="w-full pl-9 bg-secondary/30 border-border/50 focus-visible:ring-emerald-500/30 focus-visible:border-emerald-500/50 rounded-full h-9 text-xs sm:text-sm placeholder:text-muted-foreground/70 transition-all duration-300 hover:bg-secondary/50 focus-visible:bg-secondary/50 shadow-sm hover:shadow-[0_0_15px_rgba(16,185,129,0.15)] focus-visible:shadow-[0_0_20px_rgba(16,185,129,0.25)]"
             />
             {/* Subtle keyboard shortcut hint */}
             <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 opacity-50 pointer-events-none">

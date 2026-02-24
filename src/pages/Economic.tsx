@@ -408,134 +408,128 @@ const Economic = () => {
         </div>
 
         {/* ── TABLE HEADER ── */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: '60px 40px 50px 1fr 90px 90px 90px',
-          padding: '8px 16px', background: TV.surface, borderRadius: '8px 8px 0 0',
-          border: `1px solid ${TV.border}`, borderBottom: 'none',
-          fontSize: 10, fontWeight: 700, color: TV.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em',
-        }}>
+        <div className="grid grid-cols-[60px_40px_50px_1fr_90px_90px_90px] px-4 py-3 bg-[#1e222d] rounded-t-2xl border border-white/10 border-b-0 text-[10px] font-bold text-gray-500 uppercase tracking-widest relative">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500/30 via-indigo-500/30 to-purple-500/30 rounded-t-2xl" />
           <span>TIME</span>
           <span></span>
           <span>IMP.</span>
           <span>EVENT</span>
-          <span style={{ textAlign: 'right' }}>ACTUAL</span>
-          <span style={{ textAlign: 'right' }}>FORECAST</span>
-          <span style={{ textAlign: 'right' }}>PRIOR</span>
+          <span className="text-right">ACTUAL</span>
+          <span className="text-right">FORECAST</span>
+          <span className="text-right">PRIOR</span>
         </div>
 
         {/* ── EVENT ROWS ── */}
-        <div style={{ border: `1px solid ${TV.border}`, borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
-          {filteredEvents.length === 0 ? (
-            <div style={{ padding: '48px 0', textAlign: 'center' }}>
-              <Calendar style={{ width: 32, height: 32, color: TV.textMuted, margin: '0 auto 8px' }} />
-              <p style={{ fontSize: 13, color: TV.textSecondary }}>No events matching filters</p>
-              <p style={{ fontSize: 11, color: TV.textMuted, marginTop: 4 }}>Try adjusting impact or country filters</p>
-            </div>
-          ) : (
-            filteredEvents.map((event, idx) => {
-              const isExpanded = expandedEvent === idx;
-              const hasActual = !!event.actual;
+        <div className="rounded-b-2xl overflow-hidden border border-white/10 bg-[#1e222d]/60 backdrop-blur-xl shadow-2xl relative mb-8">
+          <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
+          <div className="relative z-10">
+            {filteredEvents.length === 0 ? (
+              <div className="py-12 text-center">
+                <Calendar className="w-8 h-8 text-gray-600 mx-auto mb-3" />
+                <p className="text-[13px] text-gray-400">No events matching filters</p>
+                <p className="text-[11px] text-gray-500 mt-1">Try adjusting impact or country filters</p>
+              </div>
+            ) : (
+              filteredEvents.map((event, idx) => {
+                const isExpanded = expandedEvent === idx;
+                const hasActual = !!event.actual;
 
-              // Determine if actual beat/missed forecast
-              let beatForecast: 'beat' | 'miss' | 'inline' | null = null;
-              if (event.actual && event.forecast) {
-                const a = parseFloat(event.actual.replace(/[^0-9.-]/g, ''));
-                const f = parseFloat(event.forecast.replace(/[^0-9.-]/g, ''));
-                if (!isNaN(a) && !isNaN(f)) {
-                  beatForecast = a > f ? 'beat' : a < f ? 'miss' : 'inline';
+                let beatForecast: 'beat' | 'miss' | 'inline' | null = null;
+                if (event.actual && event.forecast) {
+                  const a = parseFloat(event.actual.replace(/[^0-9.-]/g, ''));
+                  const f = parseFloat(event.forecast.replace(/[^0-9.-]/g, ''));
+                  if (!isNaN(a) && !isNaN(f)) {
+                    beatForecast = a > f ? 'beat' : a < f ? 'miss' : 'inline';
+                  }
                 }
-              }
 
-              return (
-                <div key={idx}>
-                  <div
-                    style={{
-                      display: 'grid', gridTemplateColumns: '60px 40px 50px 1fr 90px 90px 90px',
-                      padding: '12px 16px', cursor: event.description ? 'pointer' : 'default',
-                      borderBottom: idx < filteredEvents.length - 1 ? `1px solid ${TV.border}` : 'none',
-                      background: isExpanded ? TV.surfaceHover : 'transparent',
-                      transition: 'background 0.15s',
-                      alignItems: 'center',
-                    }}
-                    onClick={() => event.description && setExpandedEvent(isExpanded ? null : idx)}
-                    onMouseEnter={e => { if (!isExpanded) (e.currentTarget).style.background = TV.surfaceHover; }}
-                    onMouseLeave={e => { if (!isExpanded) (e.currentTarget).style.background = 'transparent'; }}
-                  >
-                    {/* Time */}
-                    <span style={{ fontSize: 12, color: TV.textSecondary, fontFamily: 'monospace' }}>{event.time}</span>
+                return (
+                  <div key={idx} className="group relative">
+                    {/* Hover Glow Background */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-white/[0.03] transition-opacity duration-300 pointer-events-none" />
 
-                    {/* Country flag */}
-                    <span style={{ fontSize: 16 }} title={COUNTRY_NAMES[event.country]}>{COUNTRY_FLAGS[event.country]}</span>
+                    <div
+                      className={`grid grid-cols-[60px_40px_50px_1fr_90px_90px_90px] px-4 py-3 items-center relative z-10 ${event.description ? 'cursor-pointer hover:bg-white/[0.02]' : 'cursor-default'
+                        } ${idx < filteredEvents.length - 1 ? 'border-b border-white/5' : ''} ${isExpanded ? 'bg-white/[0.04]' : ''
+                        } transition-colors duration-200`}
+                      onClick={() => event.description && setExpandedEvent(isExpanded ? null : idx)}
+                    >
+                      {/* Left accent color for impact on hover */}
+                      <div className={`absolute left-0 top-0 bottom-0 w-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${event.impact === 'high' ? 'bg-red-500' : event.impact === 'medium' ? 'bg-orange-500' : 'bg-emerald-500'
+                        }`} />
 
-                    {/* Impact */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                      {[1, 2, 3].map(i => (
-                        <div key={i} style={{
-                          width: 4, height: event.impact === 'high' ? 16 : event.impact === 'medium' ? 12 : 8,
-                          borderRadius: 1,
-                          background: i <= (event.impact === 'high' ? 3 : event.impact === 'medium' ? 2 : 1)
-                            ? (event.impact === 'high' ? TV.high : event.impact === 'medium' ? TV.warning : TV.low)
-                            : TV.textMuted + '40',
-                        }} />
-                      ))}
+                      {/* Time */}
+                      <span className="text-xs text-gray-400 font-mono tracking-wide">{event.time}</span>
+
+                      {/* Country flag */}
+                      <span className="text-base" title={COUNTRY_NAMES[event.country]}>{COUNTRY_FLAGS[event.country]}</span>
+
+                      {/* Impact */}
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3].map(i => (
+                          <div key={i} className={`w-1 rounded-sm ${i <= (event.impact === 'high' ? 3 : event.impact === 'medium' ? 2 : 1)
+                              ? (event.impact === 'high' ? 'bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.5)]' : event.impact === 'medium' ? 'bg-orange-500' : 'bg-emerald-500')
+                              : 'bg-white/10'
+                            }`} style={{ height: event.impact === 'high' ? 14 : event.impact === 'medium' ? 10 : 6 }} />
+                        ))}
+                      </div>
+
+                      {/* Event name */}
+                      <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
+                        <span className="text-[13px] font-semibold text-gray-200 group-hover:text-white transition-colors truncate">
+                          {event.event}
+                        </span>
+                        {event.category && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-gray-400 uppercase tracking-wider flex-shrink-0 border border-white/10">
+                            {event.category}
+                          </span>
+                        )}
+                        {event.isCustom && (
+                          <>
+                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 uppercase tracking-wider flex-shrink-0 border border-blue-500/20">
+                              Your Event
+                            </span>
+                            <button
+                              onClick={e2 => { e2.stopPropagation(); handleDeleteCustom(event.customId!); }}
+                              className="w-5 h-5 rounded flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              title="Delete event"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Actual */}
+                      <span className={`text-right text-[13px] ${hasActual
+                          ? beatForecast === 'beat' ? 'text-emerald-400 font-bold drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]'
+                            : beatForecast === 'miss' ? 'text-red-400 font-bold drop-shadow-[0_0_8px_rgba(248,113,113,0.3)]'
+                              : 'text-gray-200 font-bold'
+                          : 'text-gray-500'
+                        }`}>
+                        {event.actual || '—'}
+                      </span>
+
+                      {/* Forecast */}
+                      <span className="text-right text-[13px] text-gray-400">{event.forecast || '—'}</span>
+
+                      {/* Prior */}
+                      <span className="text-right text-[13px] text-gray-500">{event.prior || '—'}</span>
                     </div>
 
-                    {/* Event name */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: TV.text }}>{event.event}</span>
-                      {event.category && (
-                        <span style={{
-                          fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 3,
-                          background: 'rgba(120,123,134,0.12)', color: TV.textSecondary,
-                          textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0,
-                        }}>{event.category}</span>
-                      )}
-                      {event.isCustom && (
-                        <>
-                          <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: `${TV.blue}20`, color: TV.blue, textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>Your Event</span>
-                          <button
-                            onClick={e2 => { e2.stopPropagation(); handleDeleteCustom(event.customId!); }}
-                            style={{ width: 18, height: 18, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: TV.textMuted, flexShrink: 0, opacity: 0.6, transition: 'all 0.15s' }}
-                            onMouseEnter={e2 => { (e2.currentTarget).style.color = TV.danger; (e2.currentTarget).style.opacity = '1'; }}
-                            onMouseLeave={e2 => { (e2.currentTarget).style.color = TV.textMuted; (e2.currentTarget).style.opacity = '0.6'; }}
-                            title="Delete event"
-                          >
-                            <Trash2 style={{ width: 11, height: 11 }} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Actual */}
-                    <span style={{
-                      textAlign: 'right', fontSize: 13, fontWeight: hasActual ? 700 : 400,
-                      color: hasActual
-                        ? (beatForecast === 'beat' ? TV.success : beatForecast === 'miss' ? TV.danger : TV.text)
-                        : TV.textMuted,
-                    }}>
-                      {event.actual || '—'}
-                    </span>
-
-                    {/* Forecast */}
-                    <span style={{ textAlign: 'right', fontSize: 13, color: TV.textSecondary }}>{event.forecast || '—'}</span>
-
-                    {/* Prior */}
-                    <span style={{ textAlign: 'right', fontSize: 13, color: TV.textMuted }}>{event.prior || '—'}</span>
+                    {/* Expanded description */}
+                    {isExpanded && event.description && (
+                      <div className={`p-4 pl-[166px] bg-white/[0.04] relative z-10 border-t border-white/5 ${idx < filteredEvents.length - 1 ? 'border-b border-white/5' : ''
+                        }`}>
+                        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500/50" />
+                        <p className="text-[11px] text-gray-400 leading-relaxed max-w-2xl">{event.description}</p>
+                      </div>
+                    )}
                   </div>
-
-                  {/* Expanded description */}
-                  {isExpanded && event.description && (
-                    <div style={{
-                      padding: '10px 16px 14px', paddingLeft: 166, background: TV.surfaceHover,
-                      borderBottom: idx < filteredEvents.length - 1 ? `1px solid ${TV.border}` : 'none',
-                    }}>
-                      <p style={{ fontSize: 11, color: TV.textSecondary, lineHeight: 1.6 }}>{event.description}</p>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
 
         {/* ── LEGEND ── */}

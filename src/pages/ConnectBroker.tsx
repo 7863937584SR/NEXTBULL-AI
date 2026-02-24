@@ -405,31 +405,38 @@ const ConnectBroker = () => {
                   </div>
                 )}
 
-                {/* Logo + Name */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
+                {/* Large Centered Logo */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 16, marginTop: 4 }}>
                   <div style={{
-                    width: 44, height: 44, borderRadius: 8, background: '#262b3d',
+                    width: 72, height: 72, borderRadius: 16, background: 'rgba(38, 43, 61, 0.4)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
                     border: `1px solid ${TV.border}`, flexShrink: 0,
-                  }}>
+                    boxShadow: '0 8px 24px -8px rgba(0,0,0,0.5)', transition: 'all 0.3s'
+                  }} className="group-hover:border-blue-500/30 group-hover:bg-blue-500/5">
                     <img src={broker.logoUrl} alt={broker.name}
-                      style={{ width: 28, height: 28, objectFit: 'contain' }}
-                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.innerText = broker.name[0]; }}
+                      style={{ width: 48, height: 48, objectFit: 'contain' }}
+                      onError={e => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        const p = (e.target as HTMLImageElement).parentElement!;
+                        p.innerText = broker.name.substring(0, 2);
+                        p.style.fontSize = '24px';
+                        p.style.fontWeight = '800';
+                        p.style.color = TV.blue;
+                      }}
                     />
                   </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: TV.text }}>{broker.name}</div>
-                    <div style={{ fontSize: 11, color: TV.textSecondary, marginTop: 1 }}>{broker.desc}</div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 12, color: TV.textSecondary, marginTop: 2 }}>{broker.desc}</div>
                   </div>
                 </div>
 
                 {/* Badges */}
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 14 }}>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 20 }}>
                   {broker.badges.map(b => (
                     <span key={b} style={{
-                      fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 3,
-                      background: 'rgba(120,123,134,0.12)', color: TV.textSecondary,
-                      textTransform: 'uppercase', letterSpacing: '0.04em',
+                      fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 4,
+                      background: 'rgba(120,123,134,0.08)', color: TV.textSecondary,
+                      textTransform: 'uppercase', letterSpacing: '0.05em', border: '1px solid rgba(120,123,134,0.1)'
                     }}>{b}</span>
                   ))}
                 </div>
@@ -513,13 +520,13 @@ const ConnectBroker = () => {
             {/* Modal Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 16px', borderBottom: `1px solid ${TV.border}` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: '#262b3d', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: `1px solid ${TV.border}` }}>
-                  <img src={activeBroker.logoUrl} alt="" style={{ width: 22, height: 22, objectFit: 'contain' }}
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(38, 43, 61, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: `1px solid ${TV.border}` }}>
+                  <img src={activeBroker.logoUrl} alt="Broker Logo" style={{ width: 32, height: 32, objectFit: 'contain' }}
                     onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 </div>
                 <div>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: TV.text }}>Connect {activeBroker.name}</div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: TV.text }}>Connect Account</div>
                   <div style={{ fontSize: 11, color: TV.textSecondary }}>{activeBroker.desc}</div>
                 </div>
               </div>
