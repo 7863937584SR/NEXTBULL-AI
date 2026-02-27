@@ -46,18 +46,18 @@ interface BrokerInfo {
 }
 
 const BROKERS: BrokerInfo[] = [
-  { id: 'zerodha', name: 'Zerodha', desc: 'India\'s largest stock broker', badges: ['Stocks', 'F&O', 'MF'], logoUrl: 'https://logo.clearbit.com/zerodha.com', devUrl: 'https://developers.kite.trade/', docsUrl: 'https://kite.trade/docs/connect/v3/', supportsOtp: true, supportsApi: true },
-  { id: 'upstox', name: 'Upstox', desc: 'Next-gen trading platform', badges: ['Stocks', 'F&O', 'IPO'], logoUrl: 'https://logo.clearbit.com/upstox.com', devUrl: 'https://account.upstox.com/developer/apps', docsUrl: 'https://upstox.com/developer/api-documentation/', supportsOtp: true, supportsApi: true },
-  { id: 'groww', name: 'Groww', desc: 'Stocks, MF & more', badges: ['Stocks', 'MF', 'SIP'], logoUrl: 'https://logo.clearbit.com/groww.in', devUrl: 'https://groww.in/', docsUrl: 'https://groww.in/', supportsOtp: true, supportsApi: false },
-  { id: 'angelone', name: 'Angel One', desc: 'Smart API & algo trading', badges: ['Stocks', 'F&O', 'Algo'], logoUrl: 'https://logo.clearbit.com/angelone.in', devUrl: 'https://smartapi.angelone.in/', docsUrl: 'https://smartapi.angelone.in/docs', supportsOtp: true, supportsApi: true },
-  { id: 'dhan', name: 'Dhan', desc: 'Lightning-fast trading', badges: ['Stocks', 'Options', 'API'], logoUrl: 'https://logo.clearbit.com/dhan.co', devUrl: 'https://dhanhq.co/', docsUrl: 'https://dhanhq.co/docs/v2/', supportsOtp: true, supportsApi: true },
-  { id: 'fyers', name: 'Fyers', desc: 'Built for active traders', badges: ['Stocks', 'F&O', 'Charts'], logoUrl: 'https://logo.clearbit.com/fyers.in', devUrl: 'https://myapi.fyers.in/', docsUrl: 'https://myapi.fyers.in/docsv3', supportsOtp: true, supportsApi: true },
-  { id: 'fivepaisa', name: '5Paisa', desc: 'Flat ₹20 per trade', badges: ['Stocks', 'F&O', 'MF'], logoUrl: 'https://logo.clearbit.com/5paisa.com', devUrl: 'https://www.5paisa.com/developerapi', docsUrl: 'https://www.5paisa.com/developerapi', supportsOtp: true, supportsApi: true },
-  { id: 'iifl', name: 'IIFL Securities', desc: 'Research & advisory', badges: ['Stocks', 'Research', 'MF'], logoUrl: 'https://logo.clearbit.com/indiainfoline.com', devUrl: 'https://www.indiainfoline.com/', docsUrl: 'https://www.indiainfoline.com/', supportsOtp: true, supportsApi: false },
-  { id: 'motilal', name: 'Motilal Oswal', desc: 'Premium broker with PMS', badges: ['Stocks', 'PMS', 'F&O'], logoUrl: 'https://logo.clearbit.com/motilaloswal.com', devUrl: 'https://www.motilaloswal.com/', docsUrl: 'https://www.motilaloswal.com/', supportsOtp: true, supportsApi: false },
-  { id: 'icici', name: 'ICICI Direct', desc: 'Full-service broking', badges: ['Stocks', 'MF', 'Bonds'], logoUrl: 'https://logo.clearbit.com/icicidirect.com', devUrl: 'https://www.icicidirect.com/', docsUrl: 'https://www.icicidirect.com/', supportsOtp: true, supportsApi: false },
-  { id: 'hdfc', name: 'HDFC Securities', desc: 'Bank-backed brokerage', badges: ['Stocks', 'MF', 'IPO'], logoUrl: 'https://logo.clearbit.com/hdfcsec.com', devUrl: 'https://www.hdfcsec.com/', docsUrl: 'https://www.hdfcsec.com/', supportsOtp: true, supportsApi: false },
-  { id: 'kotak', name: 'Kotak Securities', desc: 'Neo trading platform', badges: ['Stocks', 'F&O', 'NeoPlus'], logoUrl: 'https://logo.clearbit.com/kotaksecurities.com', devUrl: 'https://www.kotaksecurities.com/', docsUrl: 'https://www.kotaksecurities.com/', supportsOtp: true, supportsApi: false },
+  { id: 'zerodha', name: 'Zerodha', desc: 'India\'s largest stock broker', badges: ['Stocks', 'F&O', 'MF'], logoUrl: 'https://www.google.com/s2/favicons?domain=zerodha.com&sz=128', devUrl: 'https://developers.kite.trade/', docsUrl: 'https://kite.trade/docs/connect/v3/', supportsOtp: true, supportsApi: true },
+  { id: 'upstox', name: 'Upstox', desc: 'Next-gen trading platform', badges: ['Stocks', 'F&O', 'IPO'], logoUrl: 'https://www.google.com/s2/favicons?domain=upstox.com&sz=128', devUrl: 'https://account.upstox.com/developer/apps', docsUrl: 'https://upstox.com/developer/api-documentation/', supportsOtp: true, supportsApi: true },
+  { id: 'groww', name: 'Groww', desc: 'Stocks, MF & more', badges: ['Stocks', 'MF', 'SIP'], logoUrl: 'https://www.google.com/s2/favicons?domain=groww.in&sz=128', devUrl: 'https://groww.in/', docsUrl: 'https://groww.in/', supportsOtp: true, supportsApi: false },
+  { id: 'angelone', name: 'Angel One', desc: 'Smart API & algo trading', badges: ['Stocks', 'F&O', 'Algo'], logoUrl: 'https://www.google.com/s2/favicons?domain=angelone.in&sz=128', devUrl: 'https://smartapi.angelone.in/', docsUrl: 'https://smartapi.angelone.in/docs', supportsOtp: true, supportsApi: true },
+  { id: 'dhan', name: 'Dhan', desc: 'Lightning-fast trading', badges: ['Stocks', 'Options', 'API'], logoUrl: 'https://www.google.com/s2/favicons?domain=dhan.co&sz=128', devUrl: 'https://dhanhq.co/', docsUrl: 'https://dhanhq.co/docs/v2/', supportsOtp: true, supportsApi: true },
+  { id: 'fyers', name: 'Fyers', desc: 'Built for active traders', badges: ['Stocks', 'F&O', 'Charts'], logoUrl: 'https://www.google.com/s2/favicons?domain=fyers.in&sz=128', devUrl: 'https://myapi.fyers.in/', docsUrl: 'https://myapi.fyers.in/docsv3', supportsOtp: true, supportsApi: true },
+  { id: 'fivepaisa', name: '5Paisa', desc: 'Flat ₹20 per trade', badges: ['Stocks', 'F&O', 'MF'], logoUrl: 'https://www.google.com/s2/favicons?domain=5paisa.com&sz=128', devUrl: 'https://www.5paisa.com/developerapi', docsUrl: 'https://www.5paisa.com/developerapi', supportsOtp: true, supportsApi: true },
+  { id: 'iifl', name: 'IIFL Securities', desc: 'Research & advisory', badges: ['Stocks', 'Research', 'MF'], logoUrl: 'https://www.google.com/s2/favicons?domain=indiainfoline.com&sz=128', devUrl: 'https://www.indiainfoline.com/', docsUrl: 'https://www.indiainfoline.com/', supportsOtp: true, supportsApi: false },
+  { id: 'motilal', name: 'Motilal Oswal', desc: 'Premium broker with PMS', badges: ['Stocks', 'PMS', 'F&O'], logoUrl: 'https://www.google.com/s2/favicons?domain=motilaloswal.com&sz=128', devUrl: 'https://www.motilaloswal.com/', docsUrl: 'https://www.motilaloswal.com/', supportsOtp: true, supportsApi: false },
+  { id: 'icici', name: 'ICICI Direct', desc: 'Full-service broking', badges: ['Stocks', 'MF', 'Bonds'], logoUrl: 'https://www.google.com/s2/favicons?domain=icicidirect.com&sz=128', devUrl: 'https://www.icicidirect.com/', docsUrl: 'https://www.icicidirect.com/', supportsOtp: true, supportsApi: false },
+  { id: 'hdfc', name: 'HDFC Securities', desc: 'Bank-backed brokerage', badges: ['Stocks', 'MF', 'IPO'], logoUrl: 'https://www.google.com/s2/favicons?domain=hdfcsec.com&sz=128', devUrl: 'https://www.hdfcsec.com/', docsUrl: 'https://www.hdfcsec.com/', supportsOtp: true, supportsApi: false },
+  { id: 'kotak', name: 'Kotak Securities', desc: 'Neo trading platform', badges: ['Stocks', 'F&O', 'NeoPlus'], logoUrl: 'https://www.google.com/s2/favicons?domain=kotaksecurities.com&sz=128', devUrl: 'https://www.kotaksecurities.com/', docsUrl: 'https://www.kotaksecurities.com/', supportsOtp: true, supportsApi: false },
 ];
 
 type OtpStep = 'phone' | 'otp' | 'verifying' | 'done';
@@ -321,9 +321,16 @@ const ConnectBroker = () => {
 
         {/* ── HEADER ── */}
         <div style={{ marginBottom: 8 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: TV.text, letterSpacing: '-0.02em' }}>
-            Broker Connections
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <img
+              src="/nextbull-logo.jpg"
+              alt="NextBull"
+              style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover' }}
+            />
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: TV.text, letterSpacing: '-0.02em' }}>
+              Broker Connections
+            </h1>
+          </div>
           <p style={{ fontSize: 13, color: TV.textSecondary, marginTop: 4 }}>
             Connect your broker account to trade directly from NextBull GPT
           </p>
@@ -406,39 +413,25 @@ const ConnectBroker = () => {
                 )}
 
                 {/* Large Centered Logo */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 16, marginTop: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 32, marginTop: 8 }}>
                   <div style={{
-                    width: 72, height: 72, borderRadius: 16, background: 'rgba(38, 43, 61, 0.4)',
+                    width: 96, height: 96, borderRadius: 24, background: 'rgba(38, 43, 61, 0.4)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-                    border: `1px solid ${TV.border}`, flexShrink: 0,
-                    boxShadow: '0 8px 24px -8px rgba(0,0,0,0.5)', transition: 'all 0.3s'
-                  }} className="group-hover:border-blue-500/30 group-hover:bg-blue-500/5">
+                    border: `2px solid ${TV.border}`, flexShrink: 0,
+                    boxShadow: '0 12px 32px -12px rgba(0,0,0,0.6)', transition: 'all 0.3s'
+                  }} className="group-hover:border-blue-500/50 group-hover:bg-blue-500/10">
                     <img src={broker.logoUrl} alt={broker.name}
-                      style={{ width: 48, height: 48, objectFit: 'contain' }}
+                      style={{ width: 68, height: 68, objectFit: 'contain' }}
                       onError={e => {
                         (e.target as HTMLImageElement).style.display = 'none';
                         const p = (e.target as HTMLImageElement).parentElement!;
                         p.innerText = broker.name.substring(0, 2);
-                        p.style.fontSize = '24px';
+                        p.style.fontSize = '32px';
                         p.style.fontWeight = '800';
                         p.style.color = TV.blue;
                       }}
                     />
                   </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 12, color: TV.textSecondary, marginTop: 2 }}>{broker.desc}</div>
-                  </div>
-                </div>
-
-                {/* Badges */}
-                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 20 }}>
-                  {broker.badges.map(b => (
-                    <span key={b} style={{
-                      fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 4,
-                      background: 'rgba(120,123,134,0.08)', color: TV.textSecondary,
-                      textTransform: 'uppercase', letterSpacing: '0.05em', border: '1px solid rgba(120,123,134,0.1)'
-                    }}>{b}</span>
-                  ))}
                 </div>
 
                 {/* CTA */}

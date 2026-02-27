@@ -38,6 +38,13 @@ export const TopMovers = () => {
         return num.toLocaleString('en-IN');
     };
 
+    const formatPct = (ltp: number, prev: number) => {
+        if (!Number.isFinite(ltp) || !Number.isFinite(prev) || prev <= 0) return null;
+        const pct = ((ltp - prev) / prev) * 100;
+        if (!Number.isFinite(pct)) return null;
+        return pct;
+    };
+
     return (
         <Card className="h-full bg-card/60 backdrop-blur-md border-border/40 overflow-hidden shadow-xl shadow-black/20 flex flex-col">
             <CardHeader className="pb-3 px-4 pt-4 border-b border-border/20 flex flex-row items-center justify-between space-y-0">
@@ -124,9 +131,8 @@ export const TopMovers = () => {
                         ) : (
                             <div className="space-y-1.5 p-1">
                                 {activeData?.slice(0, 10).map((stock) => {
-                                    const isPositive = stock.netPrice >= 0; // Or standard % change calc
-                                    const percentChange = ((stock.ltp - stock.previousPrice) / stock.previousPrice) * 100;
-                                    const isGainer = percentChange >= 0;
+                                    const pct = formatPct(stock.ltp, stock.previousPrice);
+                                    const isGainer = (pct ?? 0) >= 0;
 
                                     return (
                                         <div
@@ -150,7 +156,7 @@ export const TopMovers = () => {
                             ${isGainer ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'}`}
                                                     >
                                                         {isGainer ? <ArrowUpIcon className="w-3 h-3 mr-0.5" /> : <ArrowDownIcon className="w-3 h-3 mr-0.5" />}
-                                                        {Math.abs(percentChange).toFixed(2)}%
+                                                        {pct === null ? '--' : `${Math.abs(pct).toFixed(2)}%`}
                                                     </div>
                                                 </div>
                                             </div>
