@@ -1,29 +1,15 @@
-import { Activity, Clock, TrendingUp, Globe, BarChart3, PieChart, ArrowUpRight } from 'lucide-react';
+import { Activity, Clock, TrendingUp, Globe, BarChart3, DollarSign } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { TopMovers } from '@/components/dashboard/TopMovers';
-import { CryptoTopMovers } from '@/components/dashboard/CryptoTopMovers';
-import { ForexRatesCard } from '@/components/dashboard/ForexRatesCard';
 import { LiveMarketTicker } from '@/components/dashboard/LiveMarketTicker';
 import { TVLazyWidget } from '@/components/dashboard/TVLazyWidget';
 import { LiveIndexCard } from '@/components/dashboard/LiveIndexCard';
+import GlobalMarketsWidget from '@/components/dashboard/GlobalMarketsWidget';
+import DeltaPromptTrade from '@/components/trading/DeltaPromptTrade';
 
 const TVUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
 
 export default function Markets() {
-
-  const miniChartConfig = (symbol: string) => ({
-    symbol,
-    width: "100%",
-    height: "100%",
-    locale: "in",
-    dateRange: "1D",
-    colorTheme: "dark",
-    isTransparent: true,
-    autosize: true,
-    largeChartUrl: ""
-  });
-
   return (
     <div className="flex-1 overflow-auto bg-[#0d0f14] custom-scrollbar">
       {/* Sticky Ticker */}
@@ -87,81 +73,87 @@ export default function Markets() {
           </div>
         </section>
 
-        {/* ═══════════════ MARKET PLACE (WATCHLIST) ═══════════════ */}
+        {/* ═══════════════ NEXTBULL AI MARKET (GLOBAL SLIDER) ═══════════════ */}
         <section>
           <div className="flex items-center gap-2 mb-4">
-            <PieChart className="w-5 h-5 text-amber-400" />
-            <h2 className="text-lg font-bold text-white tracking-tight">Market Place</h2>
-            <span className="text-xs text-slate-500 font-medium ml-2">Top Movers</span>
+            <Globe className="w-5 h-5 text-cyan-400" />
+            <h2 className="text-lg font-bold text-white tracking-tight">NextBull AI Market</h2>
+            <span className="text-xs text-slate-500 font-medium ml-2">Live widgets</span>
             <div className="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent ml-4" />
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <TopMovers />
-            <CryptoTopMovers />
-            <ForexRatesCard />
+          <GlobalMarketsWidget />
+          <div className="mt-4">
+            <DeltaPromptTrade />
+          </div>
+        </section>
+
+        {/* ═══════════════ CURRENCY PAIRS ═══════════════ */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign className="w-5 h-5 text-purple-400" />
+            <h2 className="text-lg font-bold text-white tracking-tight">Currency Pairs</h2>
+            <span className="text-xs text-slate-500 font-medium ml-2">FX · INR + Majors</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent ml-4" />
           </div>
 
-          <div className="mt-8">
-            <div className="flex items-center gap-2 mb-4">
-              <ArrowUpRight className="w-5 h-5 text-rose-400" />
-              <h3 className="text-base font-bold text-white tracking-tight">Market Heatmaps</h3>
-              <span className="text-xs text-slate-500 font-medium ml-2">India · Crypto · Forex</span>
-              <div className="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent ml-4" />
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <Card className="bg-[#131620] border border-white/5 overflow-hidden h-[170px] shadow-xl shadow-black/30 relative rounded-xl lg:col-span-3">
+              <TVLazyWidget
+                src={`${TVUrl}ticker-tape.js`}
+                height="100%"
+                skeletonHeight="h-[170px]"
+                config={{
+                  symbols: [
+                    { proName: 'FX_IDC:USDINR', title: 'USD/INR' },
+                    { proName: 'FX_IDC:EURINR', title: 'EUR/INR' },
+                    { proName: 'FX_IDC:GBPINR', title: 'GBP/INR' },
+                    { proName: 'FX_IDC:JPYINR', title: 'JPY/INR' },
+                    { proName: 'FX_IDC:EURUSD', title: 'EUR/USD' },
+                    { proName: 'FX_IDC:GBPUSD', title: 'GBP/USD' },
+                    { proName: 'FX_IDC:USDJPY', title: 'USD/JPY' },
+                    { proName: 'FX_IDC:AUDUSD', title: 'AUD/USD' },
+                    { proName: 'FX_IDC:USDCAD', title: 'USD/CAD' },
+                  ],
+                  showSymbolLogo: true,
+                  colorTheme: 'dark',
+                  isTransparent: true,
+                  displayMode: 'adaptive',
+                  locale: 'en',
+                }}
+              />
+            </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Indian Market (NIFTY / SENSEX) */}
-              <Card className="bg-[#131620] border border-white/5 overflow-hidden h-[320px] shadow-xl shadow-black/30 relative group rounded-xl hover:border-teal-500/30 transition-all duration-300">
-                <div className="absolute top-3 left-3 z-10">
-                  <span className="text-xs font-bold text-white/90 bg-teal-500/20 backdrop-blur-md px-2.5 py-1 rounded-lg border border-teal-500/30">India</span>
-                </div>
-                <TVLazyWidget
-                  src={`${TVUrl}stock-heatmap.js`}
-                  height="100%"
-                  skeletonHeight="h-[320px]"
-                  config={{
-                    exchanges: [], dataSource: "SENSEX", grouping: "sector", blockSize: "market_cap_basic",
-                    blockColor: "change", locale: "en", symbolUrl: "", colorTheme: "dark", hasTopBar: false,
-                    isDataSetEnabled: false, isZoomEnabled: true, hasSymbolTooltip: true, isMonoSize: false,
-                    width: "100%", height: "100%"
-                  }}
-                />
-              </Card>
+            <Card className="bg-[#131620] border border-white/5 overflow-hidden h-[420px] shadow-xl shadow-black/30 relative rounded-xl lg:col-span-2">
+              <TVLazyWidget
+                src={`${TVUrl}forex-cross-rates.js`}
+                height="100%"
+                skeletonHeight="h-[420px]"
+                config={{
+                  width: '100%',
+                  height: '420',
+                  isTransparent: true,
+                  colorTheme: 'dark',
+                  locale: 'en',
+                  currencies: ['EUR', 'USD', 'JPY', 'GBP', 'CHF', 'AUD', 'CAD', 'INR', 'CNY'],
+                }}
+              />
+            </Card>
 
-              {/* Crypto Heatmap */}
-              <Card className="bg-[#131620] border border-white/5 overflow-hidden h-[320px] shadow-xl shadow-black/30 relative group rounded-xl hover:border-amber-500/30 transition-all duration-300">
-                <div className="absolute top-3 left-3 z-10">
-                  <span className="text-xs font-bold text-white/90 bg-amber-500/20 backdrop-blur-md px-2.5 py-1 rounded-lg border border-amber-500/30">Crypto</span>
-                </div>
-                <TVLazyWidget
-                  src={`${TVUrl}crypto-coins-heatmap.js`}
-                  height="100%"
-                  skeletonHeight="h-[320px]"
-                  config={{
-                    dataSource: "Crypto", blockSize: "market_cap_calc", blockColor: "change",
-                    locale: "en", symbolUrl: "", colorTheme: "dark", hasTopBar: false,
-                    isDataSetEnabled: false, isZoomEnabled: true, hasSymbolTooltip: true, isMonoSize: false,
-                    width: "100%", height: "100%"
-                  }}
-                />
-              </Card>
-
-              {/* Forex Heatmap */}
-              <Card className="bg-[#131620] border border-white/5 overflow-hidden h-[320px] shadow-xl shadow-black/30 relative group rounded-xl hover:border-purple-500/30 transition-all duration-300">
-                <div className="absolute top-3 left-3 z-10">
-                  <span className="text-xs font-bold text-white/90 bg-purple-500/20 backdrop-blur-md px-2.5 py-1 rounded-lg border border-purple-500/30">Forex</span>
-                </div>
-                <TVLazyWidget
-                  src={`${TVUrl}forex-heat-map.js`}
-                  height="100%"
-                  skeletonHeight="h-[320px]"
-                  config={{
-                    width: "100%", height: "100%", currencies: ["EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD", "CNY", "INR"],
-                    isTransparent: true, colorTheme: "dark", locale: "en"
-                  }}
-                />
-              </Card>
-            </div>
+            <Card className="bg-[#131620] border border-white/5 overflow-hidden h-[420px] shadow-xl shadow-black/30 relative rounded-xl">
+              <TVLazyWidget
+                src={`${TVUrl}forex-heat-map.js`}
+                height="100%"
+                skeletonHeight="h-[420px]"
+                config={{
+                  width: '100%',
+                  height: '100%',
+                  currencies: ['EUR', 'USD', 'JPY', 'GBP', 'CHF', 'AUD', 'CAD', 'NZD', 'INR'],
+                  isTransparent: true,
+                  colorTheme: 'dark',
+                  locale: 'en',
+                }}
+              />
+            </Card>
           </div>
         </section>
 

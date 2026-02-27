@@ -13,6 +13,7 @@ export function TVLazyWidget({ src, config, height = 550, className = "", skelet
     const containerRef = useRef<HTMLDivElement>(null);
     const sentinelRef = useRef<HTMLDivElement>(null);
     const [loaded, setLoaded] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     // Initial Load Intersection Observer
     useEffect(() => {
@@ -37,6 +38,8 @@ export function TVLazyWidget({ src, config, height = 550, className = "", skelet
     useEffect(() => {
         if (!loaded || !containerRef.current) return;
 
+        setLoadError(null);
+
         // Clear previous script and container contents completely on re-render (refreshKey change)
         containerRef.current.innerHTML = '';
 
@@ -50,13 +53,24 @@ export function TVLazyWidget({ src, config, height = 550, className = "", skelet
         script.src = src;
         script.type = 'text/javascript';
         script.async = true;
+        script.onerror = () => {
+            setLoadError('TradingView widget blocked');
+        };
         // Deep clone config to avoid mutating original, then stringify
         script.innerHTML = JSON.stringify(config);
 
         containerRef.current.appendChild(script);
 
+        const timeout = window.setTimeout(() => {
+            const el = containerRef.current;
+            if (!el) return;
+            const hasIframe = el.querySelector('iframe');
+            if (!hasIframe) setLoadError('TradingView widget blocked');
+        }, 6000);
+
         // Cleanup function to prevent multiple scripts if unmounted rapidly
         return () => {
+            window.clearTimeout(timeout);
             if (containerRef.current) containerRef.current.innerHTML = '';
         }
     }, [loaded, src, config, height]);
@@ -64,7 +78,26 @@ export function TVLazyWidget({ src, config, height = 550, className = "", skelet
     return (
         <div ref={sentinelRef} className={className} style={{ height: loaded ? height : 'auto' }}>
             {loaded ? (
-                <div ref={containerRef} className="tradingview-widget-container h-full w-full" />
+                <div className="h-full w-full">
+                    {loadError ? (
+                        <div className="h-full w-full flex flex-col items-center justify-center text-center p-6 gap-3">
+                            <div className="text-sm font-semibold text-foreground">Widget unavailable</div>
+                            <div className="text-xs text-muted-foreground max-w-[360px]">
+                                TradingView resources are blocked (403) on this network/browser. You can open the chart directly on TradingView.
+                            </div>
+                            <a
+                                className="text-xs font-semibold text-primary hover:underline"
+                                href="https://www.tradingview.com/"
+                                target="_blank"
+                                rel="noreferrer"
+                            >
+                                Open TradingView
+                            </a>
+                        </div>
+                    ) : (
+                        <div ref={containerRef} className="tradingview-widget-container h-full w-full" />
+                    )}
+                </div>
             ) : (
                 <div className={`space-y-3 p-6 flex flex-col justify-center ${skeletonHeight}`}>
                     <Skeleton className="h-4 w-3/4" />

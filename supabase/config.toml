@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.market-news]
 verify_jwt = false
+
+[functions.delta-trade]
+verify_jwt = false

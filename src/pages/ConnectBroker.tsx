@@ -48,6 +48,7 @@ interface BrokerInfo {
 const BROKERS: BrokerInfo[] = [
   { id: 'zerodha', name: 'Zerodha', desc: 'India\'s largest stock broker', badges: ['Stocks', 'F&O', 'MF'], logoUrl: 'https://www.google.com/s2/favicons?domain=zerodha.com&sz=128', devUrl: 'https://developers.kite.trade/', docsUrl: 'https://kite.trade/docs/connect/v3/', supportsOtp: true, supportsApi: true },
   { id: 'upstox', name: 'Upstox', desc: 'Next-gen trading platform', badges: ['Stocks', 'F&O', 'IPO'], logoUrl: 'https://www.google.com/s2/favicons?domain=upstox.com&sz=128', devUrl: 'https://account.upstox.com/developer/apps', docsUrl: 'https://upstox.com/developer/api-documentation/', supportsOtp: true, supportsApi: true },
+  { id: 'delta', name: 'Delta Exchange', desc: 'Crypto derivatives exchange', badges: ['Crypto', 'F&O', 'API'], logoUrl: 'https://www.google.com/s2/favicons?domain=delta.exchange&sz=128', devUrl: 'https://docs.delta.exchange/', docsUrl: 'https://docs.delta.exchange/', supportsOtp: false, supportsApi: true },
   { id: 'groww', name: 'Groww', desc: 'Stocks, MF & more', badges: ['Stocks', 'MF', 'SIP'], logoUrl: 'https://www.google.com/s2/favicons?domain=groww.in&sz=128', devUrl: 'https://groww.in/', docsUrl: 'https://groww.in/', supportsOtp: true, supportsApi: false },
   { id: 'angelone', name: 'Angel One', desc: 'Smart API & algo trading', badges: ['Stocks', 'F&O', 'Algo'], logoUrl: 'https://www.google.com/s2/favicons?domain=angelone.in&sz=128', devUrl: 'https://smartapi.angelone.in/', docsUrl: 'https://smartapi.angelone.in/docs', supportsOtp: true, supportsApi: true },
   { id: 'dhan', name: 'Dhan', desc: 'Lightning-fast trading', badges: ['Stocks', 'Options', 'API'], logoUrl: 'https://www.google.com/s2/favicons?domain=dhan.co&sz=128', devUrl: 'https://dhanhq.co/', docsUrl: 'https://dhanhq.co/docs/v2/', supportsOtp: true, supportsApi: true },
@@ -111,6 +112,7 @@ const ConnectBroker = () => {
   const [filterTab, setFilterTab] = useState('all');
   const [connections, setConnections] = useState<BrokerConnection[]>([]);
   const [loadingStatus, setLoadingStatus] = useState(true);
+  const [supabaseDown, setSupabaseDown] = useState(false);
 
   // connect modal state
   const [activeBroker, setActiveBroker] = useState<BrokerInfo | null>(null);
@@ -137,7 +139,19 @@ const ConnectBroker = () => {
         .select('broker, is_active, broker_user_id, user_name, email, token_expiry')
         .eq('user_id', user.id).eq('is_active', true);
       if (!error && data) setConnections(data);
-    } catch { } finally { setLoadingStatus(false); }
+      if (error) {
+        console.error('DB fetch error:', error);
+        const msg = error.message || '';
+        if (msg.includes('Failed to fetch') || msg.includes('timeout') || msg.includes('ERR_CONNECTION_TIMED_OUT')) {
+          setSupabaseDown(true);
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('Failed to fetch') || msg.includes('ERR_CONNECTION_TIMED_OUT') || msg.includes('NetworkError')) {
+        setSupabaseDown(true);
+      }
+    } finally { setLoadingStatus(false); }
   }, [user]);
 
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
@@ -171,6 +185,16 @@ const ConnectBroker = () => {
   // ── Save connection to DB (robust — handles missing columns gracefully) ──
   const saveToDB = async (brokerId: string, phone?: string) => {
     if (!user) { toast({ title: 'Not logged in', description: 'Please log in to connect a broker.', variant: 'destructive' }); return false; }
+
+    const isNetworkError = (e: unknown) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      return (
+        msg.includes('Failed to fetch') ||
+        msg.includes('ERR_CONNECTION_TIMED_OUT') ||
+        msg.includes('NetworkError')
+      );
+    };
+
     try {
       const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Trader';
       const baseRow: Record<string, unknown> = {
@@ -190,21 +214,103 @@ const ConnectBroker = () => {
         { onConflict: 'user_id,broker' }
       );
 
+      const needsUniqueConstraintFallback = (msg: string) => {
+        const m = msg.toLowerCase();
+        return (
+          m.includes('on_conflict') ||
+          m.includes('unique') ||
+          m.includes('constraint') ||
+          m.includes('duplicate')
+        );
+      };
+
       // If it fails (e.g. columns don't exist), retry without the extra columns
       if (result.error) {
+        if (isNetworkError(result.error)) {
+          toast({
+            title: 'Supabase unreachable',
+            description: 'Could not reach Supabase (timeout). Check your internet/VPN/firewall or try again.',
+            variant: 'destructive',
+          });
+          return false;
+        }
+
+        if (needsUniqueConstraintFallback(result.error.message || '')) {
+          const existing = await supabase
+            .from('broker_connections')
+            .select('broker')
+            .eq('user_id', user.id)
+            .eq('broker', brokerId)
+            .maybeSingle();
+
+          if (existing.error && !isNetworkError(existing.error)) {
+            console.warn('Constraint fallback lookup failed:', existing.error.message);
+          }
+
+          if (existing.data) {
+            const upd = await supabase
+              .from('broker_connections')
+              .update({ ...baseRow, phone_number: phone || null, connection_method: phone ? 'otp' : 'api' } as any)
+              .eq('user_id', user.id)
+              .eq('broker', brokerId);
+
+            if (upd.error) {
+              console.error('DB update error:', upd.error);
+              toast({ title: 'Connection Error', description: upd.error.message, variant: 'destructive' });
+              return false;
+            }
+            return true;
+          }
+
+          const ins = await supabase
+            .from('broker_connections')
+            .insert({ ...baseRow, phone_number: phone || null, connection_method: phone ? 'otp' : 'api' } as any);
+
+          if (ins.error) {
+            console.error('DB insert error:', ins.error);
+            toast({ title: 'Connection Error', description: ins.error.message, variant: 'destructive' });
+            return false;
+          }
+          return true;
+        }
+
         console.warn('Upsert with extra columns failed, retrying without:', result.error.message);
         result = await supabase.from('broker_connections').upsert(baseRow as any, { onConflict: 'user_id,broker' });
       }
 
       if (result.error) {
         console.error('DB save error:', result.error);
-        toast({ title: 'Connection Error', description: result.error.message, variant: 'destructive' });
+        if (needsUniqueConstraintFallback(result.error.message || '')) {
+          toast({
+            title: 'Database constraint missing',
+            description: 'Supabase table is missing a unique constraint for (user_id, broker). Add it in Supabase, or we can use insert/update fallback.',
+            variant: 'destructive',
+          });
+          return false;
+        }
+        if (isNetworkError(result.error)) {
+          toast({
+            title: 'Supabase unreachable',
+            description: 'Could not reach Supabase (timeout). Check your internet/VPN/firewall or try again.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({ title: 'Connection Error', description: result.error.message, variant: 'destructive' });
+        }
         return false;
       }
       return true;
     } catch (err) {
       console.error('saveToDB exception:', err);
-      toast({ title: 'Connection Error', description: err instanceof Error ? err.message : 'Unknown error saving connection.', variant: 'destructive' });
+      if (isNetworkError(err)) {
+        toast({
+          title: 'Supabase unreachable',
+          description: 'Could not reach Supabase (timeout). Check your internet/VPN/firewall or try again.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: 'Connection Error', description: err instanceof Error ? err.message : 'Unknown error saving connection.', variant: 'destructive' });
+      }
       return false;
     }
   };
@@ -257,6 +363,11 @@ const ConnectBroker = () => {
     if (urls[activeBroker.id]) {
       window.location.href = urls[activeBroker.id];
     } else {
+      if (activeBroker.id === 'delta') {
+        localStorage.setItem('delta_api_key', apiKey);
+        localStorage.setItem('delta_api_secret', apiSecret);
+      }
+
       // For brokers without OAuth URLs, save directly via OTP-style connection
       const saved = await saveToDB(activeBroker.id);
       if (saved) {
@@ -266,6 +377,10 @@ const ConnectBroker = () => {
       } else {
         toast({ title: 'Connection Failed', description: `Could not connect ${activeBroker.name}.`, variant: 'destructive' });
       }
+
+      localStorage.removeItem('broker_api_key');
+      localStorage.removeItem('broker_api_secret');
+      localStorage.removeItem('broker_name');
       setIsConnecting(false);
     }
   };
@@ -318,6 +433,46 @@ const ConnectBroker = () => {
   return (
     <div style={{ background: TV.bg, minHeight: 'calc(100vh - 3.5rem)', color: TV.text }}>
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
+
+        {supabaseDown && (
+          <div style={{
+            marginBottom: 16,
+            padding: '12px 14px',
+            borderRadius: 8,
+            border: `1px solid ${TV.danger}55`,
+            background: `${TV.danger}15`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <AlertCircle style={{ width: 16, height: 16, color: TV.danger, marginTop: 2 }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: TV.text }}>Supabase is unreachable</div>
+                <div style={{ fontSize: 12, color: TV.textSecondary, marginTop: 2 }}>
+                  Broker connection status can’t be loaded/saved right now (connection timeout). Check internet/VPN/firewall and retry.
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => { setSupabaseDown(false); setLoadingStatus(true); fetchStatus(); }}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 700,
+                background: TV.blue,
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* ── HEADER ── */}
         <div style={{ marginBottom: 8 }}>

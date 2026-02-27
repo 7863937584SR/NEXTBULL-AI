@@ -1,7 +1,16 @@
-import { useEffect, useRef, useState, memo, useCallback } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Globe, TrendingUp, BarChart3, IndianRupee, Bitcoin, DollarSign } from 'lucide-react';
+import { Globe, IndianRupee, Bitcoin } from 'lucide-react';
+import { TVLazyWidget } from '@/components/dashboard/TVLazyWidget';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+    type CarouselApi,
+    Carousel,
+    CarouselContent,
+    CarouselItem,
+    CarouselNext,
+    CarouselPrevious,
+} from '@/components/ui/carousel';
 
 /**
  * Comprehensive live market data — all powered by TradingView widgets.
@@ -15,65 +24,28 @@ const TV = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
 /* ── Lazy-loaded TradingView widget with IntersectionObserver ── */
 function LazyWidget({ src, config, height = 550 }: { src: string; config: object; height?: number }) {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const sentinelRef = useRef<HTMLDivElement>(null);
-    const [loaded, setLoaded] = useState(false);
-
-    useEffect(() => {
-        const sentinel = sentinelRef.current;
-        if (!sentinel) return;
-
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting && !loaded) {
-                    setLoaded(true);
-                    observer.disconnect();
-                }
-            },
-            { rootMargin: '200px' } // Start loading 200px before visible
-        );
-
-        observer.observe(sentinel);
-        return () => observer.disconnect();
-    }, [loaded]);
-
-    useEffect(() => {
-        if (!loaded || !containerRef.current) return;
-        containerRef.current.innerHTML = '';
-
-        const innerWidget = document.createElement('div');
-        innerWidget.className = 'tradingview-widget-container__widget';
-        innerWidget.style.height = 'calc(100% - 32px)';
-        innerWidget.style.width = '100%';
-        containerRef.current.appendChild(innerWidget);
-
-        const script = document.createElement('script');
-        script.src = src;
-        script.type = 'text/javascript';
-        script.async = true;
-        script.innerHTML = JSON.stringify(config);
-        containerRef.current.appendChild(script);
-    }, [loaded, src, config]);
+    const skeletonHeight =
+        height === 160
+            ? 'h-[160px]'
+            : height === 400
+                ? 'h-[400px]'
+                : height === 450
+                    ? 'h-[450px]'
+                    : height === 500
+                        ? 'h-[500px]'
+                        : height === 520
+                            ? 'h-[520px]'
+                            : height === 600
+                                ? 'h-[600px]'
+                                : 'h-[550px]';
 
     return (
-        <div ref={sentinelRef}>
-            {loaded ? (
-                <div ref={containerRef} className="tradingview-widget-container" />
-            ) : (
-                <div className="space-y-3 p-6" style={{ height }}>
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-4 w-1/2" />
-                    <div className="flex gap-3 mt-4">
-                        <Skeleton className="h-24 flex-1" />
-                        <Skeleton className="h-24 flex-1" />
-                        <Skeleton className="h-24 flex-1" />
-                    </div>
-                    <Skeleton className="h-32 w-full mt-3" />
-                    <Skeleton className="h-4 w-2/3 mt-3" />
-                    <Skeleton className="h-4 w-1/3" />
-                </div>
-            )}
-        </div>
+        <TVLazyWidget
+            src={src}
+            config={config}
+            height={height}
+            skeletonHeight={skeletonHeight}
+        />
     );
 }
 
@@ -235,143 +207,11 @@ const CRYPTO_CONFIG = {
     ],
 };
 
-const CRYPTO_SCREENER_CONFIG = {
-    width: '100%', height: '550', defaultColumn: 'overview',
-    defaultScreen: 'crypto_has_crypto', market: 'crypto',
-    showToolbar: true, colorTheme: 'dark', locale: 'en', isTransparent: true,
-};
-
-const FOREX_RATES_CONFIG = {
-    width: '100%', height: '400', isTransparent: true, colorTheme: 'dark', locale: 'en',
-    currencies: ['EUR', 'USD', 'JPY', 'GBP', 'CHF', 'AUD', 'CAD', 'INR', 'CNY'],
-};
-
-const FOREX_HEATMAP_CONFIG = {
-    width: '100%', height: '450', isTransparent: true, colorTheme: 'dark', locale: 'en',
-    currencies: ['EUR', 'USD', 'JPY', 'GBP', 'CHF', 'AUD', 'CAD', 'NZD', 'INR'],
-};
-
-const HEATMAP_CRYPTO = {
-    dataSource: "Crypto",
-    blockSize: "market_cap_calc",
-    blockColor: "change",
-    locale: "en",
-    symbolUrl: "",
-    colorTheme: "dark",
-    hasTopBar: true,
-    isDataSetEnabled: false,
-    isZoomEnabled: true,
-    hasSymbolTooltip: true,
-    isMonoSize: false,
-    width: "100%",
-    height: "500"
-};
-
-const HEATMAP_SENSEX = {
-    exchanges: [], dataSource: 'SENSEX', grouping: 'sector', blockSize: 'market_cap_basic',
-    blockColor: 'change', locale: 'en', symbolUrl: '', colorTheme: 'dark', hasTopBar: true,
-    isDataSetEnabled: false, isZoomEnabled: true, hasSymbolTooltip: true, isMonoSize: false,
-    width: '100%', height: '500',
-};
-
-const HEATMAP_SPX = {
-    ...HEATMAP_SENSEX, dataSource: 'SPX500',
-};
-
-const SCREENER_CONFIG = {
-    width: '100%', height: '550', defaultColumn: 'overview',
-    defaultScreen: 'most_capitalized', market: 'india',
-    showToolbar: true, colorTheme: 'dark', locale: 'en', isTransparent: true,
-};
-
-
-export const MarketScreeners = memo(() => {
-    return (
-        <div className="space-y-6">
-            <SectionCard
-                title="Stock Screener"
-                subtitle="Live · Top gainers, losers, most active · Filter by market cap, P/E"
-                icon={BarChart3}
-                gradientFrom="from-indigo-500/20 to-violet-500/10"
-                gradientVia="ring-indigo-500/20"
-                borderVia="via-indigo-500/60"
-            >
-                <LazyWidget src={TV + 'screener.js'} config={SCREENER_CONFIG} height={600} />
-            </SectionCard>
-
-            <SectionCard
-                title="Crypto Screener"
-                subtitle="Live · All coins · Sort by market cap, volume, change %"
-                icon={BarChart3}
-                gradientFrom="from-amber-500/20 to-yellow-500/10"
-                gradientVia="ring-amber-500/20"
-                borderVia="via-amber-500/60"
-            >
-                <LazyWidget src={TV + 'screener.js'} config={CRYPTO_SCREENER_CONFIG} height={600} />
-            </SectionCard>
-        </div>
-    );
-});
-MarketScreeners.displayName = 'MarketScreeners';
-
-export const MarketHeatmaps = memo(() => {
-    return (
-        <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <SectionCard
-                    title="Forex Cross Rates"
-                    subtitle="Live matrix · EUR, USD, JPY, GBP, CHF, AUD, CAD, INR, CNY"
-                    icon={DollarSign}
-                    gradientFrom="from-violet-500/20 to-purple-500/10"
-                    gradientVia="ring-violet-500/20"
-                    borderVia="via-violet-500/60"
-                >
-                    <LazyWidget src={TV + 'forex-cross-rates.js'} config={FOREX_RATES_CONFIG} height={400} />
-                </SectionCard>
-
-                <SectionCard
-                    title="Crypto Heatmap"
-                    subtitle="Live · Top Cryptocurrencies by Market Cap"
-                    icon={Bitcoin}
-                    gradientFrom="from-orange-500/20 to-amber-500/10"
-                    gradientVia="ring-orange-500/20"
-                    borderVia="via-orange-500/60"
-                >
-                    <LazyWidget src={TV + 'crypto-coins-heatmap.js'} config={HEATMAP_CRYPTO} height={450} />
-                </SectionCard>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <SectionCard
-                    title="SENSEX Heatmap"
-                    subtitle="Indian market · Sector-wise by market cap"
-                    icon={TrendingUp}
-                    gradientFrom="from-teal-500/20 to-emerald-500/10"
-                    gradientVia="ring-teal-500/20"
-                    borderVia="via-teal-500/60"
-                >
-                    <LazyWidget src={TV + 'stock-heatmap.js'} config={HEATMAP_SENSEX} height={500} />
-                </SectionCard>
-
-                <SectionCard
-                    title="S&P 500 Heatmap"
-                    subtitle="US market · Large-cap stocks"
-                    icon={Globe}
-                    gradientFrom="from-blue-500/20 to-cyan-500/10"
-                    gradientVia="ring-blue-500/20"
-                    borderVia="via-blue-500/60"
-                >
-                    <LazyWidget src={TV + 'stock-heatmap.js'} config={HEATMAP_SPX} height={500} />
-                </SectionCard>
-            </div>
-        </div>
-    );
-});
-MarketHeatmaps.displayName = 'MarketHeatmaps';
-
 const GlobalMarketsWidget = memo(({ hideDetailedTabs = false }: { hideDetailedTabs?: boolean }) => {
     // Determine which markets are currently open to prioritize them in the UI
     const [marketOrder, setMarketOrder] = useState<('indian' | 'global' | 'crypto')[]>(['indian', 'global', 'crypto']);
+    const [api, setApi] = useState<CarouselApi | null>(null);
+    const [activeIndex, setActiveIndex] = useState(0);
 
     useEffect(() => {
         const now = new Date();
@@ -396,6 +236,17 @@ const GlobalMarketsWidget = memo(({ hideDetailedTabs = false }: { hideDetailedTa
             setMarketOrder(['indian', 'global', 'crypto']);
         }
     }, []);
+
+    useEffect(() => {
+        if (!api) return;
+        const onSelect = () => setActiveIndex(api.selectedScrollSnap());
+        onSelect();
+        api.on('select', onSelect);
+        api.on('reInit', onSelect);
+        return () => {
+            api.off('select', onSelect);
+        };
+    }, [api]);
 
     const sections = {
         indian: (
@@ -439,16 +290,80 @@ const GlobalMarketsWidget = memo(({ hideDetailedTabs = false }: { hideDetailedTa
         )
     };
 
-    return (
-        <div className="space-y-4">
-            {marketOrder.map(key => sections[key])}
+    const scrollToKey = (key: 'indian' | 'global' | 'crypto') => {
+        const idx = marketOrder.indexOf(key);
+        if (idx >= 0) api?.scrollTo(idx);
+    };
 
-            {!hideDetailedTabs && (
-                <>
-                    <MarketScreeners />
-                    <MarketHeatmaps />
-                </>
-            )}
+    return (
+        <div className="space-y-6">
+            <Card className="bg-card/80 border-border/50 backdrop-blur-sm overflow-hidden relative hover-glow">
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-blue-500/60 to-transparent" />
+                <CardHeader className="pb-2 pt-5 px-6">
+                    <div className="flex flex-col gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/10 ring-1 ring-blue-500/20">
+                                <Globe className="w-5 h-5 text-blue-400" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-lg font-bold">NextBull AI Market</CardTitle>
+                                <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                                    Live market overview
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => scrollToKey('indian')}
+                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200"
+                            >
+                                India
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => scrollToKey('global')}
+                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200"
+                            >
+                                Global
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => scrollToKey('crypto')}
+                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200"
+                            >
+                                Crypto
+                            </button>
+                        </div>
+                    </div>
+                </CardHeader>
+
+                <CardContent className="p-6 pt-2">
+                    <Carousel setApi={(a) => setApi(a)} opts={{ align: 'start', loop: true }} className="w-full">
+                        <CarouselContent>
+                            {marketOrder.map((key, idx) => (
+                                <CarouselItem key={key} className="md:basis-1/1">
+                                    {Math.abs(idx - activeIndex) <= 1 ? (
+                                        sections[key]
+                                    ) : (
+                                        <Card className="bg-card/80 border-border/50 backdrop-blur-sm overflow-hidden relative">
+                                            <div className="p-6 space-y-3">
+                                                <Skeleton className="h-5 w-40" />
+                                                <Skeleton className="h-3 w-64" />
+                                                <Skeleton className="h-[520px] w-full" />
+                                            </div>
+                                        </Card>
+                                    )}
+                                </CarouselItem>
+                            ))}
+                        </CarouselContent>
+                        <CarouselPrevious className="left-2 top-6 -translate-y-0 bg-background/60 border-white/10 hover:bg-background/80" />
+                        <CarouselNext className="right-2 top-6 -translate-y-0 bg-background/60 border-white/10 hover:bg-background/80" />
+                    </Carousel>
+                </CardContent>
+            </Card>
         </div>
     );
 });
