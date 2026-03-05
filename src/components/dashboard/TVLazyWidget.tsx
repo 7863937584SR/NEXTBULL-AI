@@ -9,6 +9,17 @@ interface TVLazyWidgetProps {
     skeletonHeight?: string;
 }
 
+// Resolve script URL: if relative /tv-widget path, convert to direct CDN
+function resolveTVSrc(src: string): string {
+    if (src.startsWith('/tv-widget')) {
+        return 'https://s3.tradingview.com' + src.replace(/^\/tv-widget/, '');
+    }
+    // Already absolute
+    if (src.startsWith('http')) return src;
+    // Bare path like 'external-embedding/embed-widget-advanced-chart.js'
+    return 'https://s3.tradingview.com/' + src;
+}
+
 export function TVLazyWidget({ src, config, height = 550, className = "", skeletonHeight = "h-[500px]" }: TVLazyWidgetProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const sentinelRef = useRef<HTMLDivElement>(null);
@@ -58,7 +69,7 @@ export function TVLazyWidget({ src, config, height = 550, className = "", skelet
         containerRef.current.appendChild(innerWidget);
 
         const script = document.createElement('script');
-        script.src = src;
+        script.src = resolveTVSrc(src);
         script.type = 'text/javascript';
         script.async = true;
         script.onerror = () => {
@@ -89,19 +100,35 @@ export function TVLazyWidget({ src, config, height = 550, className = "", skelet
             {loaded ? (
                 <div className="h-full w-full">
                     {loadError ? (
-                        <div className="h-full w-full flex flex-col items-center justify-center text-center p-6 gap-3">
-                            <div className="text-sm font-semibold text-foreground">Widget unavailable</div>
-                            <div className="text-xs text-muted-foreground max-w-[360px]">
-                                TradingView resources are blocked (403) on this network/browser. You can open the chart directly on TradingView.
+                        <div className="h-full w-full flex flex-col items-center justify-center text-center p-6 gap-4">
+                            <div className="p-3 rounded-full bg-amber-500/10">
+                                <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M12 3l9 16H3L12 3z" /></svg>
                             </div>
-                            <a
-                                className="text-xs font-semibold text-primary hover:underline"
-                                href="https://www.tradingview.com/"
-                                target="_blank"
-                                rel="noreferrer"
-                            >
-                                Open TradingView
-                            </a>
+                            <div className="text-sm font-semibold text-foreground">Chart loading failed</div>
+                            <div className="text-xs text-muted-foreground max-w-[400px]">
+                                The TradingView widget could not load. This may be due to an ad-blocker, network restriction, or browser privacy setting.
+                            </div>
+                            {(() => {
+                                try {
+                                    const cfg = JSON.parse(configJson);
+                                    const sym = cfg.symbol || '';
+                                    if (sym) {
+                                        return (
+                                            <a
+                                                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 transition-colors"
+                                                href={`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(sym)}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                            >
+                                                Open {sym.replace(/^[A-Z]+:/, '')} on TradingView ↗
+                                            </a>
+                                        );
+                                    }
+                                } catch {}
+                                return (
+                                    <a className="text-xs font-semibold text-primary hover:underline" href="https://www.tradingview.com/" target="_blank" rel="noreferrer">Open TradingView ↗</a>
+                                );
+                            })()}
                         </div>
                     ) : (
                         <div ref={containerRef} className="tradingview-widget-container h-full w-full" />

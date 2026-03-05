@@ -9,7 +9,7 @@ interface StockSearchModalProps {
     symbol: string | null;
 }
 
-const TVUrl = '/tv-widget/external-embedding/embed-widget-';
+const TVUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
 export function StockSearchModal({ isOpen, onClose, symbol }: StockSearchModalProps) {
     const [formattedSymbol, setFormattedSymbol] = useState<string | null>(null);

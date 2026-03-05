@@ -8,7 +8,7 @@ import DeltaPromptTrade from '@/components/trading/DeltaPromptTrade';
 import { useState, useEffect, useMemo } from 'react';
 import { NextBullLogo } from '@/components/NextBullLogo';
 
-const TVUrl = '/tv-widget/external-embedding/embed-widget-';
+const TVUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
 export default function Markets() {
   const [currentTime, setCurrentTime] = useState(new Date());

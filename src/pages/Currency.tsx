@@ -12,7 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchForexRates } from '@/services/forexService';
 import { NextBullLogo } from '@/components/NextBullLogo';
 
-const TVUrl = '/tv-widget/external-embedding/embed-widget-';
+const TVUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
 // Real-time market data fetcher
 const fetchMarketStatus = async () => {
