@@ -3,7 +3,29 @@ import { Outlet } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './AppHeader';
 import { useQuery } from '@tanstack/react-query';
-import { fetchLiveMarketStatus, fetchLiveRates, LiveMarketStatus, LiveRates } from '@/services/liveMarketService';
+import { fetchLiveMarketStatus, fetchLiveRates, fetchTickerStocks, LiveMarketStatus, LiveRates, StockTickerItem } from '@/services/liveMarketService';
+
+interface NewsItem {
+  title: string;
+  time: string;
+}
+
+const fetchSidebarNews = async (): Promise<NewsItem[]> => {
+  try {
+    // Use Google News RSS via a public CORS proxy (rss2json)
+    const res = await fetch('https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fnews.google.com%2Frss%2Fsearch%3Fq%3Dindian%2Bstock%2Bmarket%26hl%3Den-IN%26gl%3DIN%26ceid%3DIN%3Aen');
+    if (!res.ok) throw new Error('RSS fetch failed');
+    const data = await res.json();
+    return (data.items || []).slice(0, 4).map((item: any) => ({
+      title: (item.title || '').slice(0, 80),
+      time: new Date(item.pubDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+    }));
+  } catch {
+    return [
+      { title: 'Markets data loading...', time: '--:--' },
+    ];
+  }
+};
 
 export const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -13,15 +35,29 @@ export const AppLayout = () => {
   const { data: marketStatus } = useQuery({
     queryKey: ['market-status'],
     queryFn: fetchLiveMarketStatus,
-    refetchInterval: false,
+    refetchInterval: 60000,
     staleTime: 50000,
   });
 
   const { data: liveRates } = useQuery({
     queryKey: ['live-rates'],
     queryFn: fetchLiveRates,
-    refetchInterval: false,
+    refetchInterval: 30000,
     staleTime: 8000,
+  });
+
+  const { data: tickerStocks } = useQuery({
+    queryKey: ['ticker-stocks'],
+    queryFn: fetchTickerStocks,
+    refetchInterval: 30000,
+    staleTime: 15000,
+  });
+
+  const { data: sidebarNews } = useQuery({
+    queryKey: ['sidebar-news'],
+    queryFn: fetchSidebarNews,
+    refetchInterval: 120000,
+    staleTime: 60000,
   });
 
   useEffect(() => {
@@ -70,7 +106,7 @@ export const AppLayout = () => {
               USD/INR <span className="text-white/80">{liveRates?.usdInr.rate.toFixed(2) || '—'}</span> {liveRates ? formatChange(liveRates.usdInr.changePercent, true) : <span className="text-gray-600">—</span>}
             </span>
             <span className="text-emerald-400/90">
-              NIFTY <span className="text-white/80">{liveRates?.nifty.value.toFixed(0) || '—'}</span> {liveRates ? formatChange(liveRates.nifty.change) : <span className="text-gray-600">—</span>}
+              NIFTY <span className="text-white/80">{liveRates?.nifty.value.toFixed(0) || '—'}</span> {liveRates ? formatChange(liveRates.nifty.changePercent, true) : <span className="text-gray-600">—</span>}
             </span>
             <span className="text-cyan-400/90">
               BTC <span className="text-white/80">{liveRates?.btcUsd.rate.toFixed(0) || '—'}</span> {liveRates ? formatChange(liveRates.btcUsd.changePercent, true) : <span className="text-gray-600">—</span>}
@@ -85,14 +121,21 @@ export const AppLayout = () => {
       {/* Scrolling Stock Ticker */}
       <div className="bg-[#050505] border-b border-emerald-500/8 py-1 overflow-hidden">
         <div className="animate-scroll flex gap-10 text-[11px]">
-          <span className="text-cyan-400">RELIANCE <span className="text-white/70">2856.75</span> <span className="text-emerald-400">▲23.40</span></span>
-          <span className="text-cyan-400">TCS <span className="text-white/70">3890.20</span> <span className="text-red-400">▼15.60</span></span>
-          <span className="text-cyan-400">INFY <span className="text-white/70">1567.85</span> <span className="text-emerald-400">▲28.90</span></span>
-          <span className="text-cyan-400">HDFC BANK <span className="text-white/70">1678.30</span> <span className="text-emerald-400">▲12.45</span></span>
-          <span className="text-cyan-400">ICICI BANK <span className="text-white/70">1089.50</span> <span className="text-red-400">▼8.20</span></span>
-          <span className="text-cyan-400">ITC <span className="text-white/70">456.75</span> <span className="text-emerald-400">▲5.60</span></span>
-          <span className="text-cyan-400">BHARTI AIRTEL <span className="text-white/70">1245.30</span> <span className="text-emerald-400">▲18.75</span></span>
-          <span className="text-cyan-400">WIPRO <span className="text-white/70">467.20</span> <span className="text-red-400">▼3.10</span></span>
+          {tickerStocks && tickerStocks.length > 0 ? (
+            tickerStocks.map((s) => (
+              <span key={s.symbol} className="text-cyan-400 whitespace-nowrap">
+                {s.symbol}{' '}
+                <span className="text-white/70">{s.price.toFixed(2)}</span>{' '}
+                <span className={s.change >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                  {s.change >= 0 ? '▲' : '▼'}{Math.abs(s.change).toFixed(2)}
+                </span>
+              </span>
+            ))
+          ) : (
+            <>
+              <span className="text-gray-500 animate-pulse">Loading live stock prices...</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -122,15 +165,15 @@ export const AppLayout = () => {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-500">SENSEX</span>
-                      <span className="text-emerald-400">73,745 ▲0.91%</span>
+                      <span>{liveRates?.sensex.value.toFixed(0) || '—'} {liveRates ? formatChange(liveRates.sensex.changePercent, true) : <span className="text-gray-600">—</span>}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-500">BANK NIFTY</span>
-                      <span className="text-red-400">47,890 ▼0.24%</span>
+                      <span>{liveRates?.bankNifty.value.toFixed(0) || '—'} {liveRates ? formatChange(liveRates.bankNifty.changePercent, true) : <span className="text-gray-600">—</span>}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-500">VIX</span>
-                      <span className="text-yellow-400">14.25 ▲2.15%</span>
+                      <span>{liveRates?.vix.value.toFixed(2) || '—'} {liveRates ? formatChange(liveRates.vix.changePercent, true) : <span className="text-gray-600">—</span>}</span>
                     </div>
                   </div>
                 </div>
@@ -174,7 +217,7 @@ export const AppLayout = () => {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-500">SOL/USD</span>
-                      <span className="text-emerald-400">145.67 ▲3.24%</span>
+                      <span>{liveRates?.solUsd.rate.toFixed(2) || '—'} {liveRates ? formatChange(liveRates.solUsd.changePercent, true) : <span className="text-gray-600">—</span>}</span>
                     </div>
                   </div>
                 </div>
@@ -186,15 +229,15 @@ export const AppLayout = () => {
                     BREAKING NEWS
                   </div>
                   <div className="space-y-2 text-gray-400">
-                    <div className="text-[10px] leading-relaxed">
-                      <span className="text-cyan-400/70 mr-1">15:30</span> RBI keeps repo rate unchanged at 6.50%
-                    </div>
-                    <div className="text-[10px] leading-relaxed">
-                      <span className="text-cyan-400/70 mr-1">14:45</span> IT stocks surge on Q4 guidance
-                    </div>
-                    <div className="text-[10px] leading-relaxed">
-                      <span className="text-cyan-400/70 mr-1">13:20</span> FII inflows ▲₹2,500 crores
-                    </div>
+                    {sidebarNews && sidebarNews.length > 0 ? (
+                      sidebarNews.map((item, i) => (
+                        <div key={i} className="text-[10px] leading-relaxed">
+                          <span className="text-cyan-400/70 mr-1">{item.time}</span> {item.title}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-[10px] leading-relaxed text-gray-500 animate-pulse">Loading news...</div>
+                    )}
                   </div>
                 </div>
 

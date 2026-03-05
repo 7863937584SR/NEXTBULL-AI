@@ -23,7 +23,7 @@ export default function CurrencyQuickWidget() {
   const { data: forexData, isLoading: forexLoading, refetch: refetchForex } = useQuery({
     queryKey: ['quick-detailed-forex'],
     queryFn: fetchDetailedForexRates,
-    refetchInterval: false,
+    refetchInterval: 30000,
     staleTime: 12000,
   });
 
@@ -31,7 +31,7 @@ export default function CurrencyQuickWidget() {
   const { data: cryptoData, isLoading: cryptoLoading, refetch: refetchCrypto } = useQuery({
     queryKey: ['quick-crypto'],
     queryFn: fetchTopCryptoMovers,
-    refetchInterval: false,
+    refetchInterval: 30000,
     staleTime: 15000,
   });
 

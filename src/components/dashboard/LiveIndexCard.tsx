@@ -13,7 +13,7 @@ export function LiveIndexCard({ indexName, refreshInterval = 5000 }: LiveIndexCa
     const { data: indices, isLoading, isError } = useQuery({
         queryKey: ['nse-indices', 'live-card'],
         queryFn: fetchMarketIndices,
-        refetchInterval: false,
+        refetchInterval: 30000,
         retry: 3,
     });
 

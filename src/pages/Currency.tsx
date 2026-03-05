@@ -48,14 +48,14 @@ export default function CurrencyPage() {
   const { data: marketStatus, isLoading: statusLoading } = useQuery({
     queryKey: ['market-status'],
     queryFn: fetchMarketStatus,
-    refetchInterval: false,
+    refetchInterval: 60000,
   });
 
   // Real-time volatility data
   const { data: volatilityData, isLoading: volatilityLoading } = useQuery({
     queryKey: ['volatility-data'],
     queryFn: fetchVolatilityData,
-    refetchInterval: false,
+    refetchInterval: 30000,
   });
 
   // Update market time every second

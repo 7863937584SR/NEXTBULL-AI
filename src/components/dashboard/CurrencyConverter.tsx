@@ -58,7 +58,7 @@ export const CurrencyConverter = ({ className = '' }: CurrencyConverterProps) =>
   const { data: forexRates, isLoading, refetch } = useQuery({
     queryKey: ['forex-rates-converter'],
     queryFn: fetchForexRates,
-    refetchInterval: false,
+    refetchInterval: 60000,
     retry: 2,
   });
 

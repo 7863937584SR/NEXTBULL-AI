@@ -37,7 +37,7 @@ const EnhancedCurrencyDashboard = () => {
   const { data: forexData, isLoading: forexLoading, refetch: refetchForex } = useQuery({
     queryKey: ['detailed-forex'],
     queryFn: fetchDetailedForexRates,
-    refetchInterval: false,
+    refetchInterval: 30000,
     staleTime: 8000,
   });
 
@@ -45,61 +45,44 @@ const EnhancedCurrencyDashboard = () => {
   const { data: cryptoData, isLoading: cryptoLoading, refetch: refetchCrypto } = useQuery({
     queryKey: ['live-crypto'],
     queryFn: fetchTopCryptoMovers,
-    refetchInterval: false,
+    refetchInterval: 30000,
     staleTime: 12000,
   });
 
-  // Live commodities data (using financial APIs)
+  // Live commodities data from Yahoo Finance
   const { data: commoditiesData, isLoading: commoditiesLoading } = useQuery({
     queryKey: ['live-commodities'],
     queryFn: async (): Promise<CommodityPrice[]> => {
-      try {
-        // Fetch commodity data from financial APIs
-        const symbols = ['XAUUSD', 'XAGUSD', 'USOIL', 'UKOIL', 'NATGAS', 'COPPER'];
-        const responses = await Promise.allSettled(
-          symbols.map(symbol => 
-            fetch(`https://api.exchangerate-api.com/v4/latest/${symbol}`)
-              .catch(() => null)
-          )
-        );
-        
-        // Fallback to live commodity prices from Yahoo Finance alternative
-        const commoditySymbols = [
-          { name: 'Gold', symbol: 'XAU/USD', yahooSymbol: 'GC=F' },
-          { name: 'Silver', symbol: 'XAG/USD', yahooSymbol: 'SI=F' },
-          { name: 'Crude Oil', symbol: 'WTI', yahooSymbol: 'CL=F' },
-          { name: 'Brent Oil', symbol: 'BRENT', yahooSymbol: 'BZ=F' },
-          { name: 'Natural Gas', symbol: 'NG', yahooSymbol: 'NG=F' },
-          { name: 'Copper', symbol: 'XCU/USD', yahooSymbol: 'HG=F' },
-        ];
-        
-        // Use real-time-ish data with proper API calls
-        return commoditySymbols.map((commodity, index) => {
-          // Generate realistic price movements based on current market conditions
-          const basePrices = [2078.45, 24.67, 72.45, 77.23, 2.89, 8456.50];
-          const volatilities = [0.01, 0.02, 0.02, 0.018, 0.05, 0.015];
-          
-          const basePrice = basePrices[index];
-          const volatility = volatilities[index];
-          const randomChange = (Math.random() - 0.5) * volatility * basePrice;
-          const price = basePrice + randomChange;
-          const changePercent = (randomChange / basePrice) * 100;
-          
-          return {
-            name: commodity.name,
-            symbol: commodity.symbol,
-            price: price,
-            change: randomChange,
-            changePercent: changePercent,
-            unit: index < 2 ? '/oz' : index < 4 ? '/bbl' : index === 4 ? '/MMBtu' : '/MT'
-          };
-        });
-      } catch (error) {
-        console.error('Commodities fetch failed:', error);
-        return [];
-      }
+      const commoditySymbols = [
+        { name: 'Gold', symbol: 'XAU/USD', yahooSymbol: 'GC=F', unit: '/oz' },
+        { name: 'Silver', symbol: 'XAG/USD', yahooSymbol: 'SI=F', unit: '/oz' },
+        { name: 'Crude Oil', symbol: 'WTI', yahooSymbol: 'CL=F', unit: '/bbl' },
+        { name: 'Brent Oil', symbol: 'BRENT', yahooSymbol: 'BZ=F', unit: '/bbl' },
+        { name: 'Natural Gas', symbol: 'NG', yahooSymbol: 'NG=F', unit: '/MMBtu' },
+        { name: 'Copper', symbol: 'XCU/USD', yahooSymbol: 'HG=F', unit: '/MT' },
+      ];
+
+      const results: CommodityPrice[] = [];
+      const promises = commoditySymbols.map(async (c) => {
+        try {
+          const res = await fetch(`/api/yahoo/v8/finance/chart/${encodeURIComponent(c.yahooSymbol)}?range=1d&interval=1m`);
+          if (!res.ok) return null;
+          const data = await res.json();
+          const meta = data?.chart?.result?.[0]?.meta;
+          if (!meta) return null;
+          const price = meta.regularMarketPrice ?? meta.previousClose ?? 0;
+          const prevClose = meta.previousClose ?? price;
+          const change = price - prevClose;
+          const changePercent = prevClose ? (change / prevClose) * 100 : 0;
+          return { name: c.name, symbol: c.symbol, price, change, changePercent, unit: c.unit };
+        } catch { return null; }
+      });
+
+      const settled = await Promise.all(promises);
+      for (const r of settled) { if (r) results.push(r); }
+      return results;
     },
-    refetchInterval: false,
+    refetchInterval: 60000,
     staleTime: 15000,
   });
 

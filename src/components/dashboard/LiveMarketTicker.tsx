@@ -7,7 +7,7 @@ export const LiveMarketTicker = () => {
     const { data: indices, isLoading, isError } = useQuery({
         queryKey: ['nse-indices'],
         queryFn: fetchMarketIndices,
-        refetchInterval: false,
+        refetchInterval: 30000,
         retry: 1,
     });
 

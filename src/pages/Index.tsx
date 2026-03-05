@@ -38,9 +38,11 @@ interface Conversation {
 
 const quickActions = [
   { label: 'NIFTY 50 Analysis', prompt: 'Give me a detailed technical and sentiment analysis of NIFTY 50 today. Include key support/resistance levels, FII/DII flow data, India VIX reading, and your outlook for the week.' },
-  { label: 'Top Stock Picks', prompt: 'Suggest 3-5 high-conviction stock picks for swing trading this week from NSE. Include entry zone, stop-loss, targets, and the rationale behind each pick.' },
-  { label: 'Global Market Impact', prompt: 'How are the US markets (S&P 500, NASDAQ), crude oil prices, and dollar index (DXY) likely to impact Indian markets tomorrow? Include Fed policy context.' },
-  { label: 'Sector Analysis', prompt: 'Which Indian market sectors (IT, Banking, Pharma, Auto, FMCG, Metal) look strongest right now? Compare their relative strength and suggest the best sector to invest in.' },
+  { label: 'Top Stock Picks', prompt: 'From the live stock prices you have, suggest 3-5 high-conviction stock picks for swing trading this week. Include entry zone, stop-loss, targets, and the rationale behind each pick based on current data.' },
+  { label: 'Global Market Impact', prompt: 'Analyze how the current US markets (S&P 500, NASDAQ, Dow), crude oil, gold, DXY, and treasury yields are likely to impact Indian markets. Include crypto and forex context.' },
+  { label: 'Sector Analysis', prompt: 'Which Indian market sectors (IT, Banking, Pharma, Auto, FMCG, Metal) look strongest right now? Compare their relative strength using the live stock prices and suggest the best sector to invest in.' },
+  { label: 'Crypto Overview', prompt: 'Give me a comprehensive overview of the crypto market right now. Analyze Bitcoin, Ethereum, Solana and other top coins. Include price action, market cap trends, and trading opportunities.' },
+  { label: 'My Portfolio', prompt: 'Analyze my current portfolio positions and wallet balances from my connected broker account. Give me risk assessment, suggestions to optimize, and any positions I should consider closing or adding to.' },
 ];
 
 /** Reusable chat input bar */
@@ -332,10 +334,42 @@ const Index = () => {
 
     // Retry logic — up to 2 attempts
     const MAX_RETRIES = 2;
+
+    // ── Build Delta portfolio context if user has connected broker ──
+    let deltaPortfolio = "";
+    try {
+      const deltaApiKey = localStorage.getItem('delta_api_key');
+      const deltaApiSecret = localStorage.getItem('delta_api_secret');
+      const deltaEnv = localStorage.getItem('delta_environment') || 'india';
+      if (deltaApiKey && deltaApiSecret) {
+        const url = import.meta.env.VITE_DELTA_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+        const anon = import.meta.env.VITE_DELTA_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const dRes = await fetch(`${String(url).replace(/\/$/, '')}/functions/v1/delta-account`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: anon, Authorization: `Bearer ${anon}` },
+          body: JSON.stringify({ api_key: deltaApiKey, api_secret: deltaApiSecret, environment: deltaEnv }),
+        });
+        if (dRes.ok) {
+          const dData = await dRes.json();
+          if (dData.success) {
+            const balLines = (dData.balances || [])
+              .filter((b: any) => parseFloat(b.balance) > 0)
+              .map((b: any) => `   ${b.asset_symbol}: ${parseFloat(b.balance).toFixed(4)} (Avail: ${parseFloat(b.available_balance).toFixed(4)})`);
+            const posLines = (dData.positions || [])
+              .filter((p: any) => p.size !== 0)
+              .map((p: any) => `   ${p.product_symbol}: ${p.size > 0 ? 'LONG' : 'SHORT'} ×${Math.abs(p.size)} @ ₹${parseFloat(p.entry_price).toFixed(2)} | Unrealized P&L: ${parseFloat(p.unrealized_pnl).toFixed(2)}`);
+            if (balLines.length || posLines.length) {
+              deltaPortfolio = `Wallet Balances:\n${balLines.join('\n') || '   (empty)'}\nOpen Positions:\n${posLines.join('\n') || '   (none)'}`;
+            }
+          }
+        }
+      }
+    } catch (e) { console.warn("Delta portfolio fetch for GPT skipped:", e); }
+
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         const { data, error } = await supabase.functions.invoke('nextbull-chat', {
-          body: { messages: currentMessages }
+          body: { messages: currentMessages, deltaPortfolio }
         });
 
         if (error) {
@@ -625,11 +659,11 @@ const Index = () => {
                         <div className="space-y-2 pl-6">
                           <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            Fetching authoritative live market data...
+                            Fetching live stocks, crypto, forex, commodities & portfolio...
                           </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse" style={{ animationDelay: '1s' }}>
                             <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
-                            Querying GPT-4o, Gemini Flash, & Claude Haiku...
+                            Querying GPT-4o with 20+ live data feeds...
                           </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse" style={{ animationDelay: '2.5s' }}>
                             <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>

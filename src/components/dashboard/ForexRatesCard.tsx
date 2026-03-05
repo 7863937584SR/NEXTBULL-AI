@@ -13,7 +13,7 @@ export const ForexRatesCard = () => {
   const q = useQuery({
     queryKey: ['forex-rates-usd'],
     queryFn: fetchForexRates,
-    refetchInterval: false,
+    refetchInterval: 60000,
     retry: 1,
   });
 

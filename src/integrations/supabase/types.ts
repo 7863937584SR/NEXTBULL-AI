@@ -168,6 +168,72 @@ export type Database = {
           }
         ]
       }
+      trade_journal: {
+        Row: {
+          id: string
+          user_id: string
+          trade_date: string
+          symbol: string
+          side: string
+          entry_price: number
+          exit_price: number | null
+          quantity: number
+          pnl: number | null
+          fees: number | null
+          strategy: string | null
+          notes: string | null
+          tags: string[] | null
+          emotion: string | null
+          screenshot_url: string | null
+          broker: string | null
+          external_order_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          trade_date?: string
+          symbol: string
+          side: string
+          entry_price: number
+          exit_price?: number | null
+          quantity: number
+          pnl?: number | null
+          fees?: number | null
+          strategy?: string | null
+          notes?: string | null
+          tags?: string[] | null
+          emotion?: string | null
+          screenshot_url?: string | null
+          broker?: string | null
+          external_order_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          trade_date?: string
+          symbol?: string
+          side?: string
+          entry_price?: number
+          exit_price?: number | null
+          quantity?: number
+          pnl?: number | null
+          fees?: number | null
+          strategy?: string | null
+          notes?: string | null
+          tags?: string[] | null
+          emotion?: string | null
+          screenshot_url?: string | null
+          broker?: string | null
+          external_order_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

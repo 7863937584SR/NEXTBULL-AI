@@ -1,9 +1,3 @@
-import axios from 'axios';
-
-const TOKEN = 'sbp_fc0ebdff5d1dc6adf27b3999541bc21680952477';
-const PROJECT_REF = 'bokaqvtiriqjwtxuwnwb';
-
-const query = `
 -- Trade journal entries (manual notes + linked to real trades)
 CREATE TABLE IF NOT EXISTS public.trade_journal (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -47,31 +41,4 @@ CREATE POLICY "Users can delete own journal entries"
   USING (auth.uid() = user_id);
 
 -- Index for fast user queries
-CREATE INDEX IF NOT EXISTS idx_trade_journal_user ON public.trade_journal(user_id, trade_date DESC);
-`;
-
-async function run() {
-    try {
-        const res = await axios.post(
-            `https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`,
-            { query },
-            {
-                headers: {
-                    'Authorization': `Bearer ${TOKEN}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-        console.log('SQL Execution Success!');
-        console.log(res.data);
-    } catch (e) {
-        console.error('SQL Execution Failed.');
-        if (e.response) {
-            console.error(e.response.data);
-        } else {
-            console.error(e.message);
-        }
-    }
-}
-
-run();
+CREATE INDEX idx_trade_journal_user ON public.trade_journal(user_id, trade_date DESC);

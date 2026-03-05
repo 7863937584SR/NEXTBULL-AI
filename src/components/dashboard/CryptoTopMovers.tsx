@@ -11,7 +11,7 @@ export const CryptoTopMovers = () => {
   const q = useQuery({
     queryKey: ['crypto-top-movers'],
     queryFn: fetchTopCryptoMovers,
-    refetchInterval: false,
+    refetchInterval: 30000,
     retry: 1,
   });
 
