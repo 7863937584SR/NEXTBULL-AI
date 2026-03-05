@@ -73,3 +73,6 @@ export const fetchTopCryptoMovers = async (): Promise<CryptoTicker[]> => {
     .sort((a, b) => Math.abs(b.changePct24h ?? 0) - Math.abs(a.changePct24h ?? 0))
     .slice(0, 10);
 };
+
+// Export alias for compatibility
+export const fetchCryptoRates = fetchTopCryptoMovers;

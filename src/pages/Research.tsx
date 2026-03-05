@@ -215,7 +215,7 @@ const Research = () => {
       <div>
         <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Research & Insights</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          In-depth market analysis, sector reports, and trading strategies by NextBull Research
+          In-depth market analysis, sector reports, and trading strategies by <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent font-semibold">NextBull GPT</span> Research
         </p>
       </div>
 

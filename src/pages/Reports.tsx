@@ -85,7 +85,7 @@ const Reports = () => {
     navigate('/');
     toast({
       title: "Create a report",
-      description: "Ask NextBull AI to generate a financial report for any company.",
+      description: "Ask NextBull GPT to generate a financial report for any company.",
     });
   };
 
@@ -105,7 +105,7 @@ const Reports = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Financial Reports</h1>
-          <p className="text-muted-foreground mt-1">Saved intelligence from NextBull AI</p>
+          <p className="text-muted-foreground mt-1">Saved intelligence from <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent font-semibold">NextBull GPT</span></p>
         </div>
         <Button onClick={handleNewReport} className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
           <Plus className="w-4 h-4" />
@@ -121,7 +121,7 @@ const Reports = () => {
             </div>
             <h2 className="text-xl font-bold text-foreground mb-2">No Reports Yet</h2>
             <p className="text-muted-foreground text-center mb-8 max-w-md">
-              Your generated financial reports from NextBull AI will be securely saved here for future reference.
+              Your generated financial reports from NextBull GPT will be securely saved here for future reference.
             </p>
             <Button onClick={handleNewReport} variant="outline" className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10">
               Generate Your First Report

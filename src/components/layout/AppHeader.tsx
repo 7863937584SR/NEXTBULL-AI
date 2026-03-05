@@ -1,173 +1,160 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { MessageSquare, User, LogOut, Menu, Search, Bell } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useAuth } from '@/contexts/AuthContext';
-import { StockSearchModal } from '@/components/dashboard/StockSearchModal';
+import { Bell, Settings, User, Wifi, Database, Zap, Menu, Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { NextBullLogo } from "@/components/NextBullLogo";
 
 interface AppHeaderProps {
   onToggleSidebar: () => void;
 }
 
-export const AppHeader = ({ onToggleSidebar }: AppHeaderProps) => {
+const AppHeader = ({ onToggleSidebar }: AppHeaderProps) => {
   const { user, signOut } = useAuth();
-  const location = useLocation();
-  const isChat = location.pathname === '/';
+  const navigate = useNavigate();
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Stock Search Modal State
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeSymbol, setActiveSymbol] = useState<string | null>(null);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      setActiveSymbol(searchQuery.trim().toUpperCase());
-      setIsModalOpen(true);
-      setSearchQuery(''); // Optional: clear after search
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate("/auth");
+    } catch (error) {
+      console.error("Error signing out:", error);
     }
   };
 
   return (
-    <>
-      <header
-        className="h-14 flex items-center justify-between px-4 sm:px-5 border-b sticky top-0 z-40"
-        style={{
-          background: 'hsl(222 18% 9% / 0.8)',
-          backdropFilter: 'blur(12px)',
-          borderColor: 'hsl(222 13% 16%)',
-        }}
-      >
-        {/* Left */}
-        <div className="flex items-center gap-3 w-1/4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden w-8 h-8"
-            onClick={onToggleSidebar}
-            aria-label="Toggle sidebar"
+    <div className="h-11 bg-[#0a0a0a] border-b border-emerald-500/15 flex items-center justify-between px-4 font-mono text-xs">
+      {/* Left section - Logo & controls */}
+      <div className="flex items-center space-x-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onToggleSidebar}
+          className="lg:hidden h-7 w-7 p-0 hover:bg-emerald-500/20 text-emerald-400"
+        >
+          <Menu className="h-4 w-4" />
+        </Button>
+        
+        <a href="/" onClick={(e) => { e.preventDefault(); navigate('/'); }} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+          <NextBullLogo size="xs" glow animated showText={false} />
+          <span className="text-[12px] font-black tracking-wider">
+            <span className="bg-gradient-to-r from-blue-400 via-white to-blue-400 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]">NEXTBULL</span>
+            <span className="ml-1.5 bg-gradient-to-r from-blue-300 to-indigo-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(99,102,241,0.4)]">GPT</span>
+          </span>
+        </a>
+        
+        <div className="hidden md:flex items-center space-x-3 text-emerald-400/70 ml-2">
+          <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/10">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
+            <span className="text-[10px]">LIVE</span>
+          </div>
+          <div className="flex items-center space-x-1 text-cyan-400/60">
+            <Database className="h-3 w-3" />
+            <span className="text-[10px]">RT</span>
+          </div>
+          <div className="flex items-center space-x-1 text-amber-400/60">
+            <Zap className="h-3 w-3" />
+            <span className="text-[10px]">FEED</span>
+          </div>
+        </div>
+      </div>
+      
+      {/* Center section - Market status */}
+      <div className="hidden lg:flex flex-1 justify-center">
+        <div className="flex items-center gap-3 text-[10px]">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+            <Activity className="w-3 h-3 text-emerald-400" />
+            <span className="text-emerald-400 font-bold">MARKETS OPEN</span>
+          </div>
+          <div className="text-gray-600">│</div>
+          <span className="text-cyan-400/70">NSE: <span className="text-emerald-400">●</span> ACTIVE</span>
+          <div className="text-gray-600">│</div>
+          <span className="text-cyan-400/70">BSE: <span className="text-emerald-400">●</span> ONLINE</span>
+        </div>
+      </div>
+      
+      {/* Right section - Time and user controls */}
+      <div className="flex items-center space-x-3">
+        <div className="hidden md:block text-white text-right">
+          <div className="text-cyan-400 text-[11px] font-bold tracking-wider drop-shadow-[0_0_6px_rgba(34,211,238,0.3)]">
+            {currentTime.toLocaleTimeString('en-US', { hour12: false })}
+          </div>
+          <div className="text-emerald-400/60 text-[10px]">
+            {currentTime.toLocaleDateString('en-US', { 
+              month: 'short', day: '2-digit' 
+            }).toUpperCase()}
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-1.5">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0 hover:bg-emerald-500/15 text-emerald-400/70 hover:text-emerald-400 rounded-lg transition-all"
           >
-            <Menu className="w-5 h-5" />
+            <Bell className="h-3.5 w-3.5" />
           </Button>
-
-          {/* Live indicator (Hidden on very small screens to make room for search) */}
-          <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-md"
-            style={{ background: 'hsl(169 59% 40% / 0.08)' }}>
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: 'hsl(169 59% 40%)' }} />
-              <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: 'hsl(169 59% 40%)' }} />
-            </span>
-            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'hsl(169 59% 40%)' }}>
-              Markets Live
-            </span>
-          </div>
-        </div>
-
-        {/* Center — Global Search Bar & Mobile Title */}
-        <div className="flex-1 flex justify-center max-w-md mx-4">
-          {/* Mobile Title (Shows when search isn't focused/used, or always next to it if space permits) */}
-          <div className="lg:hidden absolute left-1/2 -translate-x-1/2 sm:static sm:translate-x-0 hidden sm:flex items-center gap-2 mr-4">
-            <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-full blur opacity-60 animate-pulse" />
-              <img src="/nextbull-logo.jpg" alt="NextBull" className="relative w-6 h-6 rounded-full object-cover ring-1 ring-white/10" />
-            </div>
-          </div>
-
-          <form onSubmit={handleSearchSubmit} className="w-full relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-emerald-500 transition-colors" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search stocks, crypto, indices... (e.g., RELIANCE, AAPL)"
-              className="w-full pl-9 bg-secondary/30 border-border/50 focus-visible:ring-emerald-500/30 focus-visible:border-emerald-500/50 rounded-full h-9 text-xs sm:text-sm placeholder:text-muted-foreground/70 transition-all duration-300 hover:bg-secondary/50 focus-visible:bg-secondary/50 shadow-sm hover:shadow-[0_0_15px_rgba(16,185,129,0.15)] focus-visible:shadow-[0_0_20px_rgba(16,185,129,0.25)]"
-            />
-            {/* Subtle keyboard shortcut hint */}
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 opacity-50 pointer-events-none">
-              <kbd className="bg-background border border-border rounded px-1.5 py-0.5 text-[9px] font-mono font-bold text-foreground">↵</kbd>
-            </div>
-          </form>
-        </div>
-
-        {/* Right */}
-        <div className="flex items-center justify-end gap-2 w-1/4">
-          <Link
-            to="/"
-            className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-all relative overflow-hidden group ${isChat ? 'font-semibold border-emerald-500/30' : 'font-medium border-transparent'
-              }`}
-            style={{
-              background: isChat ? 'hsl(169 59% 40% / 0.12)' : 'transparent',
-              color: isChat ? 'hsl(169 70% 45%)' : 'hsl(220 14% 60%)',
-              borderWidth: '1px'
-            }}
+          
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0 hover:bg-emerald-500/15 text-emerald-400/70 hover:text-emerald-400 rounded-lg transition-all"
           >
-            {isChat && <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10" />}
-            <MessageSquare className={`w-3.5 h-3.5 relative z-10 ${isChat ? 'text-emerald-400' : ''}`} />
-            <span className="relative z-10">
-              NextBull <span className={isChat ? 'text-emerald-400 font-bold tracking-wide' : ''}>AI</span>
-            </span>
-          </Link>
-
-          {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-2 px-2"
-                >
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
-                    style={{ background: 'hsl(222 100% 56% / 0.15)', color: 'hsl(222 100% 56%)' }}>
-                    {user.email?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                  <span className="text-xs hidden sm:inline text-muted-foreground font-medium">
-                    {user.email?.split('@')[0]}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <div className="px-2 py-1.5">
-                  <p className="text-xs font-medium text-foreground">{user.email?.split('@')[0]}</p>
-                  <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/profile" className="flex items-center gap-2">
-                    <User className="w-3.5 h-3.5" />
-                    Profile
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={signOut} className="text-destructive">
-                  <LogOut className="w-3.5 h-3.5 mr-2" />
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Link to="/auth">
-              <Button size="sm" className="gap-2 text-xs h-8 px-3">
-                <User className="w-3.5 h-3.5" />
-                Log in
+            <Settings className="h-3.5 w-3.5" />
+          </Button>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="h-7 w-7 rounded-full p-0 hover:bg-emerald-500/15"
+              >
+                <Avatar className="h-6 w-6 ring-1 ring-emerald-500/30">
+                  <AvatarImage src={user?.user_metadata?.avatar_url} />
+                  <AvatarFallback className="bg-emerald-500/15 text-emerald-400 text-[10px]">
+                    <User className="h-3 w-3" />
+                  </AvatarFallback>
+                </Avatar>
               </Button>
-            </Link>
-          )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent 
+              className="w-52 bg-[#0a0a0a] border-emerald-500/20 text-emerald-400 shadow-lg shadow-emerald-500/5" 
+              align="end"
+            >
+              <DropdownMenuItem 
+                onClick={() => navigate("/profile")}
+                className="hover:bg-emerald-500/15 focus:bg-emerald-500/15 text-xs"
+              >
+                <User className="h-3.5 w-3.5 mr-2" /> Profile Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={handleSignOut}
+                className="hover:bg-red-500/15 focus:bg-red-500/15 text-red-400 text-xs"
+              >
+                <Zap className="h-3.5 w-3.5 mr-2" /> Logout Terminal
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </header>
-
-      {/* Global Stock Search Overlay */}
-      <StockSearchModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        symbol={activeSymbol}
-      />
-    </>
+      </div>
+    </div>
   );
 };
+
+export { AppHeader };
+export default AppHeader;

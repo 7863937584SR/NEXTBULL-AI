@@ -1,44 +1,47 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchMarketIndices } from '@/services/nseService';
-import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowUpIcon, ArrowDownIcon, Activity } from 'lucide-react';
+import { ArrowUpIcon, ArrowDownIcon, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LiveIndexCardProps {
     indexName: string;
-    refreshInterval?: number; // ms
+    refreshInterval?: number;
 }
 
 export function LiveIndexCard({ indexName, refreshInterval = 5000 }: LiveIndexCardProps) {
     const { data: indices, isLoading, isError } = useQuery({
         queryKey: ['nse-indices', 'live-card'],
         queryFn: fetchMarketIndices,
-        refetchInterval: refreshInterval,
+        refetchInterval: false,
         retry: 3,
     });
 
     if (isLoading) {
         return (
-            <Card className="bg-card/40 border-border/50 h-[140px] p-5 flex flex-col justify-between overflow-hidden relative">
-                <div className="flex justify-between items-start">
-                    <Skeleton className="h-5 w-32" />
-                    <Skeleton className="h-6 w-6 rounded-full" />
+            <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                    <Skeleton className="h-3.5 w-20 bg-gray-800" />
+                    <Skeleton className="h-5 w-5 rounded bg-gray-800" />
                 </div>
-                <div>
-                    <Skeleton className="h-8 w-40 mb-2" />
-                    <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-7 w-28 bg-gray-800" />
+                <div className="flex items-center gap-2">
+                    <Skeleton className="h-3.5 w-14 bg-gray-800" />
+                    <Skeleton className="h-4 w-12 rounded bg-gray-800" />
                 </div>
-            </Card>
+            </div>
         );
     }
 
     if (isError || !indices) {
         return (
-            <Card className="bg-destructive/10 border-destructive/20 h-[140px] p-5 flex flex-col justify-center items-center text-center">
-                <p className="text-sm font-medium text-destructive mb-1">Failed to Load Live Data</p>
-                <p className="text-xs text-muted-foreground">{indexName}</p>
-            </Card>
+            <div className="flex flex-col items-center justify-center py-4 text-center">
+                <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center mb-2">
+                    <Minus className="w-4 h-4 text-red-400" />
+                </div>
+                <p className="text-[11px] font-mono text-red-400/80">OFFLINE</p>
+                <p className="text-[10px] text-gray-600 font-mono mt-0.5">{indexName}</p>
+            </div>
         );
     }
 
@@ -46,84 +49,76 @@ export function LiveIndexCard({ indexName, refreshInterval = 5000 }: LiveIndexCa
 
     if (!indexData) {
         return (
-            <Card className="bg-card/40 border-border/50 h-[140px] p-5 flex flex-col justify-center items-center text-center">
-                <p className="text-sm font-medium text-muted-foreground">Index Not Found</p>
-                <p className="text-xs text-muted-foreground">{indexName}</p>
-            </Card>
+            <div className="flex flex-col items-center justify-center py-4 text-center">
+                <div className="w-8 h-8 rounded-lg bg-gray-800/50 flex items-center justify-center mb-2">
+                    <Minus className="w-4 h-4 text-gray-500" />
+                </div>
+                <p className="text-[11px] font-mono text-gray-500">NO DATA</p>
+                <p className="text-[10px] text-gray-600 font-mono mt-0.5">{indexName}</p>
+            </div>
         );
     }
 
     const isPositive = indexData.percentChange >= 0;
+    const TrendIcon = isPositive ? TrendingUp : TrendingDown;
+    const accentColor = isPositive ? 'emerald' : 'red';
 
     return (
-        <Card className={cn(
-            "h-[150px] p-5 flex flex-col justify-between overflow-hidden relative group transition-all duration-500 cursor-default",
-            "bg-gradient-to-br from-[#121622] to-[#0A0D15] border-border/40 hover:-translate-y-1",
-            isPositive
-                ? "hover:shadow-[0_10px_40px_-10px_rgba(16,185,129,0.3)] hover:border-emerald-500/50 ring-1 ring-inset ring-transparent hover:ring-emerald-500/20"
-                : "hover:shadow-[0_10px_40px_-10px_rgba(239,68,68,0.3)] hover:border-red-500/50 ring-1 ring-inset ring-transparent hover:ring-red-500/20"
-        )}>
-            {/* Background Animated Gradient Glow */}
+        <div className="relative group">
+            {/* Subtle top accent line */}
             <div className={cn(
-                "absolute -top-12 -right-12 w-40 h-40 rounded-full blur-[40px] opacity-10 transition-opacity duration-700 group-hover:opacity-30",
-                isPositive ? "bg-emerald-500" : "bg-red-500"
+                "absolute top-0 left-2 right-2 h-[1px]",
+                isPositive
+                    ? "bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent"
+                    : "bg-gradient-to-r from-transparent via-red-500/40 to-transparent"
             )} />
 
-            {/* Background Grain/Texture (subtle) */}
-            <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, #ffffff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
-
-            <div className="flex justify-between items-start relative z-10">
-                <h3 className="text-[13px] font-black tracking-wider text-foreground/80 uppercase">
+            {/* Header row */}
+            <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[11px] font-bold tracking-[0.15em] text-gray-300 font-mono uppercase truncate pr-2">
                     {indexData.index}
                 </h3>
                 <div className={cn(
-                    "w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-500 shadow-sm",
+                    "w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-colors",
                     isPositive
-                        ? "bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-                        : "bg-red-500/10 text-red-500 group-hover:bg-red-500/20 group-hover:shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                        ? "bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500/20"
+                        : "bg-red-500/10 text-red-400 group-hover:bg-red-500/20"
                 )}>
-                    <Activity className="w-4 h-4" />
+                    <TrendIcon className="w-3 h-3" />
                 </div>
             </div>
 
-            <div className="relative z-10 flex flex-col gap-1.5 mt-2">
-                <div className="flex items-baseline gap-2">
-                    <span className={cn(
-                        "text-3xl font-black tracking-tighter tabular-nums drop-shadow-md transition-colors",
-                        isPositive ? "text-emerald-400 group-hover:text-emerald-400" : "text-red-400 group-hover:text-red-400"
-                    )}>
-                        {indexData.last.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                </div>
+            {/* Price */}
+            <div className={cn(
+                "text-xl sm:text-2xl font-black tabular-nums font-mono tracking-tight mb-2 transition-colors leading-none",
+                isPositive ? "text-emerald-400" : "text-red-400"
+            )}>
+                {indexData.last.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
 
+            {/* Change row */}
+            <div className="flex items-center gap-1.5 flex-wrap">
                 <div className={cn(
-                    "flex items-center text-[13px] font-bold font-mono tracking-tight",
+                    "flex items-center text-[11px] font-bold font-mono",
                     isPositive ? "text-emerald-500" : "text-red-500"
                 )}>
-                    {isPositive ? <ArrowUpIcon className="w-4 h-4 mr-0.5" strokeWidth={3.5} /> : <ArrowDownIcon className="w-4 h-4 mr-0.5" strokeWidth={3.5} />}
-                    <span className="tabular-nums drop-shadow-sm">
-                        {Math.abs(indexData.variation).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="mx-2 opacity-30 font-sans">•</span>
-                    <span className={cn(
-                        "tabular-nums px-2 py-0.5 rounded-md border shadow-sm transition-colors",
-                        isPositive
-                            ? "bg-emerald-500/10 border-emerald-500/20 group-hover:bg-emerald-500/20 group-hover:border-emerald-500/30"
-                            : "bg-red-500/10 border-red-500/20 group-hover:bg-red-500/20 group-hover:border-red-500/30"
-                    )}>
-                        {Math.abs(indexData.percentChange).toFixed(2)}%
+                    {isPositive
+                        ? <ArrowUpIcon className="w-3 h-3 mr-0.5 flex-shrink-0" strokeWidth={3} />
+                        : <ArrowDownIcon className="w-3 h-3 mr-0.5 flex-shrink-0" strokeWidth={3} />
+                    }
+                    <span className="tabular-nums">
+                        {Math.abs(indexData.variation).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                 </div>
-            </div>
-
-            {/* Live Indicator Dot */}
-            <div className="absolute bottom-4 right-4 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <span className="relative flex h-2 w-2">
-                    <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", isPositive ? "bg-emerald-400" : "bg-red-400")}></span>
-                    <span className={cn("relative inline-flex rounded-full h-2 w-2", isPositive ? "bg-emerald-500" : "bg-red-500")}></span>
+                <span className={cn(
+                    "tabular-nums text-[10px] font-bold px-1.5 py-0.5 rounded font-mono",
+                    isPositive
+                        ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                        : "bg-red-500/15 text-red-400 border border-red-500/20"
+                )}>
+                    {isPositive ? '+' : '-'}{Math.abs(indexData.percentChange).toFixed(2)}%
                 </span>
-                <span className={cn("text-[9px] font-black uppercase tracking-widest", isPositive ? "text-emerald-500/80" : "text-red-500/80")}>Live</span>
             </div>
-        </Card>
+        </div>
     );
 }

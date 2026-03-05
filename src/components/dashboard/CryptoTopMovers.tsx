@@ -3,13 +3,15 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchTopCryptoMovers } from '@/services/cryptoService';
-import { Bitcoin, ArrowDownIcon, ArrowUpIcon, AlertCircleIcon } from 'lucide-react';
+import { Bitcoin, ArrowDownIcon, ArrowUpIcon, AlertCircleIcon, Zap } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 export const CryptoTopMovers = () => {
   const q = useQuery({
     queryKey: ['crypto-top-movers'],
     queryFn: fetchTopCryptoMovers,
-    refetchInterval: 10000,
+    refetchInterval: false,
     retry: 1,
   });
 
@@ -28,6 +30,12 @@ export const CryptoTopMovers = () => {
             Live Data (10s)
           </p>
         </div>
+        <Link to="/currency">
+          <Button variant="ghost" size="sm" className="text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10">
+            <Zap className="w-3 h-3 mr-1" />
+            Enhanced
+          </Button>
+        </Link>
       </CardHeader>
 
       <CardContent className="flex-1 flex flex-col p-0">

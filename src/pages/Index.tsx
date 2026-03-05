@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { StockSearchModal } from '@/components/dashboard/StockSearchModal';
+import { NextBullLogo } from '@/components/NextBullLogo';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -329,34 +330,61 @@ const Index = () => {
     // Save user message to DB
     await saveMessage(convId, 'user', userMessageContent);
 
-    try {
-      const { data, error } = await supabase.functions.invoke('nextbull-chat', {
-        body: { messages: currentMessages }
-      });
+    // Retry logic — up to 2 attempts
+    const MAX_RETRIES = 2;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const { data, error } = await supabase.functions.invoke('nextbull-chat', {
+          body: { messages: currentMessages }
+        });
 
-      if (error) {
-        if (error.message?.includes('429')) {
-          toast({ title: 'Rate limit exceeded', description: 'Please wait a moment before sending another message.', variant: 'destructive' });
-        } else {
-          throw error;
+        if (error) {
+          // Try to extract the actual error body from a FunctionsHttpError
+          let errorMsg = error.message || 'Unknown error';
+          try {
+            if ('context' in error && (error as any).context?.body) {
+              const body = await (error as any).context.json();
+              if (body?.error) errorMsg = body.error;
+            }
+          } catch { /* ignore parse errors */ }
+
+          if (errorMsg.includes('429') || error.message?.includes('429')) {
+            toast({ title: 'Rate limit exceeded', description: 'Please wait a moment before sending another message.', variant: 'destructive' });
+            break;
+          }
+          throw new Error(errorMsg);
         }
-        return;
-      }
 
-      if (data?.response) {
-        setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
-        // Save assistant response to DB
-        await saveMessage(convId!, 'assistant', data.response);
+        // Handle edge case where function returns 200 but with an error field
+        if (data?.error) {
+          throw new Error(data.error);
+        }
+
+        if (data?.response) {
+          setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+          await saveMessage(convId!, 'assistant', data.response);
+          break; // Success — exit retry loop
+        } else {
+          throw new Error('Empty response from AI');
+        }
+      } catch (error: any) {
+        console.error(`Attempt ${attempt}/${MAX_RETRIES} failed:`, error);
+        if (attempt < MAX_RETRIES) {
+          // Wait before retrying (exponential backoff)
+          await new Promise(r => setTimeout(r, attempt * 2000));
+          continue;
+        }
+        // Final attempt failed — show error to user
+        const desc = error?.message && error.message !== 'Unknown error'
+          ? error.message
+          : 'Failed to get response. Please try again.';
+        toast({ title: 'Error', description: desc, variant: 'destructive' });
       }
-    } catch (error: any) {
-      console.error('Error sending message:', error);
-      toast({ title: 'Error', description: 'Failed to get response. Please try again.', variant: 'destructive' });
-    } finally {
-      setIsLoading(false);
-      // Reload conversation list to update timestamps/titles
-      loadConversations();
     }
-  }, [user, toast, navigate, activeConversationId, createConversation, saveMessage, loadConversations]);
+
+    setIsLoading(false);
+    loadConversations();
+  }, [user, toast, navigate, activeConversationId, attachments, createConversation, saveMessage, loadConversations]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -484,24 +512,24 @@ const Index = () => {
           <div className="flex-1 flex flex-col items-center justify-center p-8">
             <div className="mb-10 text-center flex flex-col items-center">
               <div className="relative mb-6">
-                <div className="absolute -inset-1 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-full blur-lg opacity-40 animate-pulse" />
-                <img src="/nextbull-logo.jpg" alt="NextBull" className="relative w-16 h-16 rounded-full object-cover ring-2 ring-white/20 shadow-[0_0_30px_theme(colors.blue.600/40)]" />
+                <NextBullLogo size="xl" glow animated />
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-3">
-                Ask <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent">NextBull AI</span>
+              <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-3 font-mono">
+                <span className="bg-gradient-to-r from-blue-400 via-white to-blue-400 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(59,130,246,0.5)]">NextBull</span>{' '}
+                <span className="bg-gradient-to-r from-blue-300 via-indigo-400 to-blue-500 bg-clip-text text-transparent drop-shadow-[0_0_24px_rgba(99,102,241,0.6)]">GPT</span>
               </h1>
-              <p className="text-muted-foreground text-lg">Your intelligent market companion</p>
+              <p className="text-gray-500 text-sm font-mono tracking-wider">YOUR AI-POWERED MARKET INTELLIGENCE</p>
             </div>
 
             <div className="w-full max-w-2xl mb-8 relative">
-              <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 rounded-3xl blur opacity-50" />
+              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/20 via-indigo-500/20 to-blue-500/20 rounded-3xl blur opacity-50" />
               <div className="relative">
                 <ChatInputBar
                   input={input}
                   setInput={setInput}
                   onSubmit={handleSubmit}
                   isLoading={isLoading}
-                  placeholder="Ask NextBull AI about markets, stocks, analysis..."
+                  placeholder="Ask NextBull GPT about markets, stocks, analysis..."
                   isListening={isListening}
                   startListening={startListening}
                   attachments={attachments}
@@ -517,7 +545,7 @@ const Index = () => {
                   variant="chat"
                   onClick={() => sendMessage(action.prompt)}
                   disabled={isLoading}
-                  className="bg-secondary/40 border border-border/50 hover:border-emerald-500/50 hover:bg-emerald-500/10 hover:text-emerald-400 transition-all rounded-xl"
+                  className="bg-secondary/40 border border-border/50 hover:border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-400 transition-all rounded-xl"
                 >
                   {action.label}
                 </Button>
@@ -587,12 +615,12 @@ const Index = () => {
                 })}
                 {isLoading && (
                   <div className="flex justify-start">
-                    <div className="bg-secondary rounded-2xl px-5 py-4 min-w-[300px] border border-emerald-500/20 shadow-sm relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-emerald-500/5 to-transparent flex translate-x-[-100%] animate-[shimmer_2s_infinite]" />
+                      <div className="bg-secondary rounded-2xl px-5 py-4 min-w-[300px] border border-blue-500/20 shadow-sm relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500/5 to-transparent flex translate-x-[-100%] animate-[shimmer_2s_infinite]" />
                       <div className="flex flex-col gap-3 relative z-10">
                         <div className="flex items-center gap-2.5">
-                          <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-                          <span className="text-sm font-semibold text-foreground">NextBull AI Council is analyzing...</span>
+                          <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                          <span className="text-sm font-semibold text-foreground"><span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">NextBull GPT</span> is analyzing...</span>
                         </div>
                         <div className="space-y-2 pl-6">
                           <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse">

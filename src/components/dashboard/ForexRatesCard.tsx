@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchForexRates, ForexRateRow } from '@/services/forexService';
-import { DollarSign, ArrowDownIcon, ArrowUpIcon, AlertCircleIcon } from 'lucide-react';
+import { DollarSign, ArrowDownIcon, ArrowUpIcon, AlertCircleIcon, Zap } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 type RateWithDelta = ForexRateRow & { deltaPct: number | null };
 
@@ -11,7 +13,7 @@ export const ForexRatesCard = () => {
   const q = useQuery({
     queryKey: ['forex-rates-usd'],
     queryFn: fetchForexRates,
-    refetchInterval: 10000,
+    refetchInterval: false,
     retry: 1,
   });
 
@@ -56,6 +58,12 @@ export const ForexRatesCard = () => {
             Live Data (10s)
           </p>
         </div>
+        <Link to="/currency">
+          <Button variant="ghost" size="sm" className="text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-500/10">
+            <Zap className="w-3 h-3 mr-1" />
+            Enhanced
+          </Button>
+        </Link>
       </CardHeader>
 
       <CardContent className="flex-1 flex flex-col p-0">

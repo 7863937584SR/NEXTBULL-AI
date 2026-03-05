@@ -12,24 +12,28 @@ import {
   Info,
   User,
   Link as LinkIcon,
-  LayoutDashboard,
   Globe,
   X,
+  DollarSign,
+  Terminal,
+  Activity,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { NextBullLogo } from '@/components/NextBullLogo';
 
 const navItems = [
-  { name: 'Markets', path: '/markets', icon: Globe, section: 'main', color: 'text-blue-400', bg: 'bg-blue-400/10' },
-  { name: 'Economic', path: '/economic', icon: TrendingUp, section: 'main', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-  { name: 'Research', path: '/research', icon: FileText, section: 'main', color: 'text-purple-400', bg: 'bg-purple-400/10' },
-  { name: 'News', path: '/news', icon: Newspaper, section: 'main', color: 'text-orange-400', bg: 'bg-orange-400/10' },
-  { name: 'Sentimental', path: '/sentimental', icon: BarChart3, section: 'main', color: 'text-rose-400', bg: 'bg-rose-400/10' },
-  { name: 'Events', path: '/events', icon: Calendar, section: 'tools', color: 'text-cyan-400', bg: 'bg-cyan-400/10' },
-  { name: 'Market Trace', path: '/market-trace', icon: Map, section: 'tools', color: 'text-indigo-400', bg: 'bg-indigo-400/10' },
-  { name: 'Journaling', path: '/journaling', icon: BookOpen, section: 'tools', color: 'text-teal-400', bg: 'bg-teal-400/10' },
-  { name: 'Reports', path: '/reports', icon: FileBarChart, section: 'tools', color: 'text-yellow-400', bg: 'bg-yellow-400/10' },
-  { name: 'Connect Broker', path: '/connect-broker', icon: LinkIcon, section: 'tools', color: 'text-sky-400', bg: 'bg-sky-400/10' },
-  { name: 'About', path: '/about', icon: Info, section: 'other', color: 'text-slate-400', bg: 'bg-slate-400/10' },
+  { name: 'MARKETS', path: '/markets', icon: Globe, section: 'MARKET DATA', shortcut: 'MKTV' },
+  { name: 'CURRENCY', path: '/currency', icon: DollarSign, section: 'MARKET DATA', shortcut: 'CRNC' },
+  { name: 'ECONOMIC', path: '/economic', icon: TrendingUp, section: 'MARKET DATA', shortcut: 'ECO' },
+  { name: 'RESEARCH', path: '/research', icon: FileText, section: 'ANALYTICS', shortcut: 'RSCH' },
+  { name: 'NEWS', path: '/news', icon: Newspaper, section: 'ANALYTICS', shortcut: 'NEWS' },
+  { name: 'SENTIMENT', path: '/sentimental', icon: BarChart3, section: 'ANALYTICS', shortcut: 'SENT' },
+  { name: 'EVENTS', path: '/events', icon: Calendar, section: 'TOOLS', shortcut: 'EVNT' },
+  { name: 'TRACE', path: '/market-trace', icon: Map, section: 'TOOLS', shortcut: 'TRAC' },
+  { name: 'JOURNAL', path: '/journaling', icon: BookOpen, section: 'TOOLS', shortcut: 'JRNL' },
+  { name: 'REPORTS', path: '/reports', icon: FileBarChart, section: 'TOOLS', shortcut: 'RPRT' },
+  { name: 'BROKER', path: '/connect-broker', icon: LinkIcon, section: 'TOOLS', shortcut: 'BRKR' },
+  { name: 'ABOUT', path: '/about', icon: Info, section: 'SYSTEM', shortcut: 'ABUT' },
 ];
 
 interface AppSidebarProps {
@@ -39,17 +43,11 @@ interface AppSidebarProps {
 
 export const AppSidebar = ({ isOpen, onClose }: AppSidebarProps) => {
   const location = useLocation();
-
-  const mainItems = navItems.filter(i => i.section === 'main');
-  const toolItems = navItems.filter(i => i.section === 'tools');
-  const otherItems = navItems.filter(i => i.section === 'other');
+  const sections = ['MARKET DATA', 'ANALYTICS', 'TOOLS', 'SYSTEM'];
 
   const renderItem = (item: typeof navItems[0]) => {
     const isActive = location.pathname === item.path;
     const Icon = item.icon;
-
-    // Extract base color class for glowing effects (e.g. 'bg-emerald-400' from 'bg-emerald-400/10')
-    const baseColorClass = item.bg.split('/')[0];
 
     return (
       <li key={item.path}>
@@ -57,41 +55,35 @@ export const AppSidebar = ({ isOpen, onClose }: AppSidebarProps) => {
           to={item.path}
           onClick={onClose}
           className={cn(
-            "group relative flex items-center gap-3 px-3 py-2.5 mx-3 mb-1.5 rounded-xl text-sm font-medium transition-all duration-300 border border-transparent overflow-hidden",
+            "group relative flex items-center gap-3 px-3 py-2.5 mx-2 mb-0.5 text-xs font-mono transition-all duration-200 rounded-lg",
             isActive
-              ? `bg-secondary/40 border-border/50 shadow-sm text-foreground backdrop-blur-md`
-              : "text-sidebar-foreground hover:bg-secondary/20 hover:border-border/30 hover:text-foreground hover:shadow-sm hover:backdrop-blur-sm"
+              ? "bg-gradient-to-r from-emerald-500/15 to-cyan-500/10 text-emerald-400 shadow-[inset_0_1px_0_rgba(16,185,129,0.15),0_0_12px_rgba(16,185,129,0.08)]"
+              : "hover:bg-emerald-500/5 text-gray-400 hover:text-emerald-400"
           )}
         >
-          {/* Subtle glowing background overlay inside the pill */}
-          <div className={cn(
-            "absolute inset-0 transition-opacity duration-300 opacity-0 mix-blend-screen pointer-events-none",
-            isActive ? "opacity-10" : "group-hover:opacity-[0.05]",
-            baseColorClass
-          )} />
-
           {/* Active indicator bar */}
           {isActive && (
-            <div className={cn(
-              "absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[60%] rounded-r-full drop-shadow-md",
-              baseColorClass
-            )} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-gradient-to-b from-emerald-400 to-cyan-400 rounded-r-full shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
           )}
 
-          {/* Icon Container */}
+          {/* Icon */}
           <div className={cn(
-            "p-1.5 rounded-lg flex items-center justify-center transition-all duration-300 relative z-10",
-            isActive ? item.bg : "bg-transparent group-hover:bg-background/50",
-            isActive ? "ring-1 ring-inset ring-white/10 shadow-sm" : "group-hover:ring-1 group-hover:ring-inset group-hover:ring-white/5"
+            "flex items-center justify-center w-7 h-7 rounded-md transition-all",
+            isActive 
+              ? "bg-emerald-500/15 text-emerald-400" 
+              : "text-gray-500 group-hover:text-emerald-400 group-hover:bg-emerald-500/10"
           )}>
-            <Icon className={cn(
-              "w-[18px] h-[18px] flex-shrink-0 transition-all",
-              isActive ? item.color : "text-muted-foreground group-hover:text-foreground/90",
-              isActive && "drop-shadow-md scale-110"
-            )} />
+            <Icon className="w-3.5 h-3.5 flex-shrink-0" />
           </div>
 
-          <span className="tracking-wide relative z-10">{item.name}</span>
+          {/* Label & shortcut */}
+          <div className="flex-1 flex items-center justify-between">
+            <span className="tracking-wider text-[11px]">{item.name}</span>
+            <span className={cn(
+              "text-[10px] opacity-50 font-mono px-1.5 py-0.5 rounded",
+              isActive ? "text-amber-400 bg-amber-400/10" : "text-gray-600"
+            )}>{item.shortcut}</span>
+          </div>
         </NavLink>
       </li>
     );
@@ -99,92 +91,117 @@ export const AppSidebar = ({ isOpen, onClose }: AppSidebarProps) => {
 
   return (
     <>
-      {/* Mobile backdrop */}
+      {/* Mobile Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black/80 z-40 lg:hidden"
           onClick={onClose}
-          aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
       <aside
         className={cn(
-          "w-[240px] min-h-screen flex flex-col z-50 transition-transform duration-200 border-r border-sidebar-border",
+          "w-[270px] min-h-screen flex flex-col z-50 transition-transform duration-300 border-r border-emerald-500/15 bg-[#0a0a0a] font-mono",
           "hidden lg:flex",
           isOpen && "!flex fixed inset-y-0 left-0"
         )}
-        style={{ background: 'hsl(222 18% 9%)' }}
       >
-        <Button variant="ghost" size="icon" onClick={onClose} className="absolute top-4 right-4 lg:hidden z-20 text-sidebar-foreground hover:bg-sidebar-accent w-8 h-8">
-          <X className="w-5 h-5" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={onClose} 
+          className="absolute top-4 right-4 lg:hidden z-20 text-green-400 hover:bg-green-500/20 w-8 h-8"
+        >
+          <X className="w-4 h-4" />
         </Button>
 
-        {/* Logo area */}
-        <div className="flex flex-col items-center justify-center py-8 px-4 border-b border-sidebar-border relative overflow-hidden">
-          {/* Subtle glow background for the logo area */}
-          <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none" />
+        {/* Terminal Header — Glowing NextBull Logo (clickable → chat) */}
+        <NavLink
+          to="/"
+          onClick={onClose}
+          className="flex items-center justify-center py-6 px-4 border-b border-blue-500/20 bg-gradient-to-b from-blue-500/5 to-transparent hover:from-blue-500/10 transition-all cursor-pointer"
+        >
+          <NextBullLogo size="sm" glow animated />
+        </NavLink>
 
-          <NavLink to="/" className="flex flex-col items-center gap-4 relative z-10 hover:opacity-90 transition-opacity" onClick={onClose}>
-            <div className="relative group">
-              <div className="absolute -inset-2 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-full blur-md opacity-40 group-hover:opacity-70 transition-opacity animate-pulse" />
-              <img src="/nextbull-logo.jpg" alt="NextBull" className="relative w-16 h-16 rounded-full object-cover ring-2 ring-white/10 shadow-[0_0_20px_theme(colors.blue.600/30)]" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-black tracking-tight bg-gradient-to-r from-white to-white/90 bg-clip-text text-transparent leading-none">
-                NextBull
-              </span>
-              <span className="text-[10px] font-bold px-1.5 py-[2px] rounded bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)] uppercase tracking-widest border border-emerald-500/40 leading-none">
-                AI
-              </span>
-            </div>
-          </NavLink>
+        {/* Command Line Interface */}
+        <div className="px-4 py-2 border-b border-emerald-500/15 bg-black/50">
+          <div className="text-emerald-400/80 text-[10px] font-mono flex items-center gap-1">
+            <span className="text-amber-400/80">nextbull</span>
+            <span className="text-gray-600">@</span>
+            <span className="text-cyan-400/80">terminal</span>
+            <span className="text-gray-600">:</span>
+            <span className="text-emerald-400/70">~$</span>
+            <span className="w-1.5 h-3.5 bg-emerald-400/50 ml-1 inline-block" />
+          </div>
         </div>
 
-        {/* Nav sections */}
-        <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar">
-          {/* Analytics */}
-          <div className="px-5 mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">Analytics</span>
-          </div>
-          <ul className="space-y-1 mb-6">
-            {mainItems.map(renderItem)}
-          </ul>
-
-          {/* Tools */}
-          <div className="px-5 mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">Tools</span>
-          </div>
-          <ul className="space-y-1 mb-6">
-            {toolItems.map(renderItem)}
-          </ul>
-
-          {/* Other */}
-          <div className="px-5 mb-2 mt-auto">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">Other</span>
-          </div>
-          <ul className="space-y-1">
-            {otherItems.map(renderItem)}
-          </ul>
+        {/* Navigation Sections */}
+        <nav className="flex-1 py-3 overflow-y-auto terminal-scroll">
+          {sections.map((section) => {
+            const sectionItems = navItems.filter(item => item.section === section);
+            return (
+              <div key={section} className="mb-3">
+                <div className="px-5 py-1.5 mb-1">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
+                    <div className="h-px flex-1 bg-gradient-to-r from-emerald-500/20 to-transparent" />
+                    {section}
+                    <div className="h-px flex-1 bg-gradient-to-l from-emerald-500/20 to-transparent" />
+                  </div>
+                </div>
+                <ul className="py-0.5">
+                  {sectionItems.map(renderItem)}
+                </ul>
+              </div>
+            );
+          })}
         </nav>
 
-        {/* Profile footer */}
-        <div className="border-t border-sidebar-border p-2">
+        {/* System Status Footer */}
+        <div className="border-t border-emerald-500/15 p-4 bg-gradient-to-t from-emerald-500/5 to-transparent">
+          <div className="grid grid-cols-2 gap-2 text-[10px] mb-3">
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
+              <span className="text-gray-500">STATUS</span>
+              <span className="text-emerald-400 ml-auto font-bold">ONLINE</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+              <span className="text-gray-500">UPTIME</span>
+              <span className="text-cyan-400 ml-auto">24:07:15</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              <span className="text-gray-500">CPU</span>
+              <span className="text-amber-400 ml-auto">45%</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+              <span className="text-gray-500">MEM</span>
+              <span className="text-purple-400 ml-auto">2.1GB</span>
+            </div>
+          </div>
+          
+          {/* Profile Access */}
           <NavLink
             to="/profile"
             onClick={onClose}
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+              "flex items-center gap-3 px-3 py-2.5 text-xs font-mono transition-all rounded-lg",
               location.pathname === '/profile'
-                ? "bg-primary/10 text-primary"
-                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
+                ? "bg-gradient-to-r from-emerald-500/15 to-cyan-500/10 text-emerald-400 shadow-[inset_0_1px_0_rgba(16,185,129,0.15)]"
+                : "hover:bg-emerald-500/5 text-gray-400 hover:text-emerald-400"
             )}
           >
-            <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center">
-              <User className="w-3.5 h-3.5 text-primary" />
+            <div className={cn(
+              "w-7 h-7 rounded-lg flex items-center justify-center",
+              location.pathname === '/profile' ? "bg-emerald-500/15" : "bg-gray-800"
+            )}>
+              <User className="w-3.5 h-3.5" />
             </div>
-            <span>Profile</span>
+            <span className="tracking-wider text-[11px]">PROFILE</span>
+            <span className="text-[10px] text-gray-600 ml-auto">PROF</span>
           </NavLink>
         </div>
       </aside>

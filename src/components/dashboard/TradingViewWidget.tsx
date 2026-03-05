@@ -33,7 +33,7 @@ const TradingViewWidget = memo(({ symbol: initialSymbol = 'NSE:NIFTY' }: Trading
     chartRef.current.appendChild(widget);
 
     const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+    script.src = '/tv-widget/external-embedding/embed-widget-advanced-chart.js';
     script.type = 'text/javascript';
     script.async = true;
     script.innerHTML = JSON.stringify({
@@ -72,7 +72,7 @@ const TradingViewWidget = memo(({ symbol: initialSymbol = 'NSE:NIFTY' }: Trading
     tickerRef.current.appendChild(widget);
 
     const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js';
+    script.src = '/tv-widget/external-embedding/embed-widget-ticker-tape.js';
     script.type = 'text/javascript';
     script.async = true;
     script.innerHTML = JSON.stringify({

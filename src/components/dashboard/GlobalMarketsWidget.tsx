@@ -20,7 +20,7 @@ import {
  * loading 9 heavy scripts simultaneously on page mount.
  */
 
-const TV = 'https://s3.tradingview.com/external-embedding/embed-widget-';
+const TV = '/tv-widget/external-embedding/embed-widget-';
 
 /* ── Lazy-loaded TradingView widget with IntersectionObserver ── */
 function LazyWidget({ src, config, height = 550 }: { src: string; config: object; height?: number }) {

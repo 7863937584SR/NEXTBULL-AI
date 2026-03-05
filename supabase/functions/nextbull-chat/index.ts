@@ -416,9 +416,7 @@ serve(async (req) => {
     const { messages } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
+    // API key validation is done later in the multi-provider section
 
     console.log("Fetching live market data for high-accuracy GPT context...");
 
@@ -460,126 +458,147 @@ ${"═".repeat(60)}`;
 
     console.log(`Context size: ${liveContext.length} chars | NSE:${liveNSE.length} FII:${liveFIIDII.length} VIX:${liveVIX.length} News:${liveNews.length} Global:${liveGlobal.length} Reddit:${liveReddit.length}`);
 
-    // Helper to call Lovable Gateway
-    const fetchModel = async (model: string, systemPrompt: string) => {
-      const res = await fetch("https://api.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...messages.map((msg: { role: string; content: string }) => ({
-              role: msg.role,
-              content: msg.content,
-            })),
-          ],
-          temperature: 0.2, // Slightly higher to get diverse perspectives
-          max_tokens: 2048,
-        }),
+    // ═══════════════════════════════════════════
+    // MULTI-PROVIDER AI GATEWAY (auto-detect available API key)
+    // Priority: OPENROUTER > OPENAI > GROQ > LOVABLE (legacy)
+    // ═══════════════════════════════════════════
+
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+
+    interface ProviderConfig {
+      name: string;
+      url: string;
+      key: string;
+      models: { primary: string; fallback: string };
+      extraHeaders?: Record<string, string>;
+    }
+
+    // Build list of available providers
+    const providers: ProviderConfig[] = [];
+
+    if (OPENROUTER_API_KEY) {
+      providers.push({
+        name: "OpenRouter",
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        key: OPENROUTER_API_KEY,
+        models: { primary: "openai/gpt-4o-mini", fallback: "meta-llama/llama-3.3-70b-instruct" },
+        extraHeaders: { "HTTP-Referer": "https://nextbull.app", "X-Title": "NextBull GPT" },
       });
-      if (!res.ok) throw new Error(`${model} failed: ${res.status}`);
-      const data = await res.json();
-      return data.choices?.[0]?.message?.content || "";
+    }
+
+    if (OPENAI_API_KEY) {
+      providers.push({
+        name: "OpenAI",
+        url: "https://api.openai.com/v1/chat/completions",
+        key: OPENAI_API_KEY,
+        models: { primary: "gpt-4o", fallback: "gpt-4o-mini" },
+      });
+    }
+
+    if (GROQ_API_KEY) {
+      providers.push({
+        name: "Groq",
+        url: "https://api.groq.com/openai/v1/chat/completions",
+        key: GROQ_API_KEY,
+        models: { primary: "llama-3.3-70b-versatile", fallback: "llama-3.1-8b-instant" },
+      });
+    }
+
+    // Legacy Lovable fallback
+    if (LOVABLE_API_KEY && providers.length === 0) {
+      providers.push({
+        name: "Lovable",
+        url: "https://api.lovable.dev/v1/chat/completions",
+        key: LOVABLE_API_KEY,
+        models: { primary: "openai/gpt-4o", fallback: "google/gemini-2.5-flash" },
+      });
+    }
+
+    if (providers.length === 0) {
+      throw new Error(
+        "No AI API key configured. Please set one of: OPENROUTER_API_KEY, OPENAI_API_KEY, or GROQ_API_KEY in your Supabase secrets. " +
+        "Get a free key at https://openrouter.ai or https://console.groq.com"
+      );
+    }
+
+    // Call a provider with a specific model
+    const callProvider = async (provider: ProviderConfig, model: string, systemPrompt: string, maxTokens = 4096): Promise<string> => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 55000); // 55s timeout
+      try {
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${provider.key}`,
+          "Content-Type": "application/json",
+          ...(provider.extraHeaders || {}),
+        };
+
+        const res = await fetch(provider.url, {
+          method: "POST",
+          headers,
+          signal: controller.signal,
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...messages.map((msg: { role: string; content: string }) => ({
+                role: msg.role,
+                content: msg.content,
+              })),
+            ],
+            temperature: 0.15,
+            max_tokens: maxTokens,
+          }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          throw new Error(`${provider.name}/${model} HTTP ${res.status}: ${errText.slice(0, 300)}`);
+        }
+
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (!content) throw new Error(`${provider.name}/${model} returned empty content`);
+        return content;
+      } finally {
+        clearTimeout(timeout);
+      }
     };
 
-    console.log("Council of AI: Querying GPT-4o, Gemini 2.5 Flash, and Claude 3 Haiku concurrently...");
+    // Try each provider in priority order, with primary then fallback model
+    let finalAssistantMessage = "";
+    let lastError = "";
 
-    // 1. Concurrent Multi-LLM Fetching
-    const [gptRes, geminiRes, claudeRes] = await Promise.allSettled([
-      fetchModel("openai/gpt-4o", fullSystemPrompt),
-      fetchModel("google/gemini-2.5-flash", fullSystemPrompt),
-      fetchModel("anthropic/claude-3-haiku", fullSystemPrompt),
-    ]);
+    for (const provider of providers) {
+      // Try primary model
+      try {
+        console.log(`Trying ${provider.name} / ${provider.models.primary}...`);
+        finalAssistantMessage = await callProvider(provider, provider.models.primary, fullSystemPrompt);
+        console.log(`✅ ${provider.name}/${provider.models.primary} succeeded (${finalAssistantMessage.length} chars)`);
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        console.error(`❌ ${provider.name} primary failed:`, lastError);
+      }
 
-    const gptText = gptRes.status === "fulfilled" ? gptRes.value : "";
-    const geminiText = geminiRes.status === "fulfilled" ? geminiRes.value : "";
-    const claudeText = claudeRes.status === "fulfilled" ? claudeRes.value : "";
-
-    console.log(`Council Sub-agents finished. GPT:${gptText.length} | Gemini:${geminiText.length} | Claude:${claudeText.length}`);
-
-    // Fallback if all models failed
-    if (!gptText && !geminiText && !claudeText) {
-      throw new Error("All AI sub-agents failed to respond.");
+      // Try fallback model
+      try {
+        console.log(`Trying ${provider.name} / ${provider.models.fallback}...`);
+        finalAssistantMessage = await callProvider(provider, provider.models.fallback, fullSystemPrompt);
+        console.log(`✅ ${provider.name}/${provider.models.fallback} succeeded (${finalAssistantMessage.length} chars)`);
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        console.error(`❌ ${provider.name} fallback failed:`, lastError);
+      }
     }
 
-    // 2. Final Synthesizer Call
-    console.log("Synthesizing master response via GPT-4o...");
-
-    // The Synthesis Prompt
-    const synthesisSystemPrompt = `You are the Head Synthesizer for NextBull AI. 
-You have just received three different analysis reports from your elite sub-agents (ChatGPT, Gemini, and Claude) answering the user's latest query.
-
-YOUR JOB:
-1. Review the three perspectives below.
-2. Merge the best insights, most accurate technical levels, and sharpest reasoning into ONE ultimate answer.
-3. If the sub-agents disagree, use your best judgment to find the most logical consensus based on the LIVE MARKET DATA CONTEXT provided below.
-4. DO NOT mention "Agent A", "Gemini", "Claude", etc. Deliver the answer directly to the user as the unified "NextBull AI".
-
-⚠️ CRITICAL STRUCTURAL MANDATE ⚠️
-You MUST structure your final output EXACTLY as follows. You MUST start with the MARKET DATA SNAPSHOT block containing data pulled directly from the live context below.
-
-**📊 MARKET DATA SNAPSHOT**
-*   **India VIX**: [Exact Live Value]
-*   **FII/DII Net Flow**: [Exact Live Value]
-*   **Top News Sentiment**: [Positive/Negative/Mixed]
-*   **(If specific stock asked)** **[Stock Name] Last Price**: ₹[Exact Live Value] | **Day Change**: [Exact Live Value]%
-
-**1. 📈 Technical Context**
-(Your synthesized technical analysis)
-
-**2. 🧠 Sentiment Overlay**
-(Your synthesized sentiment analysis)
-
-**3. ⚖️ Risk Assessment**
-(Your synthesized risk assessment)
-
-**4. 🎯 Actionable Conclusion**
-(Your synthesized conclusion, scenarios, and probabilities)
-
-The original Live Market Data Context for this query has been provided below. You MUST use the exact numbers from this live data feed! If any sub-agent cited a price that contradicts the live data below, REJECT the sub-agent's price and use the live data.
-
-${liveContext}
-
-═══ SUB-AGENT A (GPT) ═══
-${gptText || "(Failed to respond)"}
-
-═══ SUB-AGENT B (Gemini) ═══
-${geminiText || "(Failed to respond)"}
-
-═══ SUB-AGENT C (Claude) ═══
-${claudeText || "(Failed to respond)"}
-`;
-
-    const finalResponse = await fetch("https://api.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        // Using the smartest model for final synthesis
-        model: "openai/gpt-4o",
-        messages: [
-          { role: "system", content: synthesisSystemPrompt },
-          ...messages.slice(-1) // Only need the final user question for context in the Synthesis step
-        ],
-        temperature: 0.1,
-        max_tokens: 4096,
-      }),
-    });
-
-    if (!finalResponse.ok) {
-      throw new Error(`Synthesis Gateway error: ${finalResponse.status}`);
+    if (!finalAssistantMessage) {
+      throw new Error(`All AI providers failed. Last error: ${lastError}`);
     }
 
-    const finalData = await finalResponse.json();
-    const finalAssistantMessage = finalData.choices?.[0]?.message?.content;
-
-    console.log("Generated high-accuracy synthesized response via Multi-LLM Council.");
+    console.log("Generated NextBull GPT response successfully.");
 
     return new Response(
       JSON.stringify({ response: finalAssistantMessage }),

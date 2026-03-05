@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface TVLazyWidgetProps {
@@ -14,6 +14,10 @@ export function TVLazyWidget({ src, config, height = 550, className = "", skelet
     const sentinelRef = useRef<HTMLDivElement>(null);
     const [loaded, setLoaded] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const mountedRef = useRef(false);
+
+    // Stabilize config: only recalculate when the JSON representation actually changes
+    const configJson = useMemo(() => JSON.stringify(config), [config]);
 
     // Initial Load Intersection Observer
     useEffect(() => {
@@ -34,13 +38,17 @@ export function TVLazyWidget({ src, config, height = 550, className = "", skelet
         return () => observer.disconnect();
     }, [loaded]);
 
-    // Mount/Remount TradingView Script
+    // Mount TradingView Script — only runs when src or config *actually* change
     useEffect(() => {
         if (!loaded || !containerRef.current) return;
 
-        setLoadError(null);
+        // Skip if already mounted with same params (prevents flicker on parent re-renders)
+        if (mountedRef.current && containerRef.current.querySelector('iframe')) return;
 
-        // Clear previous script and container contents completely on re-render (refreshKey change)
+        setLoadError(null);
+        mountedRef.current = true;
+
+        // Clear previous script and container contents
         containerRef.current.innerHTML = '';
 
         const innerWidget = document.createElement('div');
@@ -56,8 +64,7 @@ export function TVLazyWidget({ src, config, height = 550, className = "", skelet
         script.onerror = () => {
             setLoadError('TradingView widget blocked');
         };
-        // Deep clone config to avoid mutating original, then stringify
-        script.innerHTML = JSON.stringify(config);
+        script.innerHTML = configJson;
 
         containerRef.current.appendChild(script);
 
@@ -71,9 +78,11 @@ export function TVLazyWidget({ src, config, height = 550, className = "", skelet
         // Cleanup function to prevent multiple scripts if unmounted rapidly
         return () => {
             window.clearTimeout(timeout);
+            mountedRef.current = false;
             if (containerRef.current) containerRef.current.innerHTML = '';
         }
-    }, [loaded, src, config, height]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loaded, src, configJson, height]);
 
     return (
         <div ref={sentinelRef} className={className} style={{ height: loaded ? height : 'auto' }}>

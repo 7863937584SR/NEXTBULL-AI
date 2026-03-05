@@ -19,6 +19,8 @@ import {
   KeyRound,
   Zap,
 } from 'lucide-react';
+import { NextBullLogo } from '@/components/NextBullLogo';
+import DeltaAccountSummary from '@/components/trading/DeltaAccountSummary';
 
 /* ═══════════════════════════════════════════
    DATA
@@ -58,7 +60,7 @@ const BROKERS: BrokerInfo[] = [
   { id: 'motilal', name: 'Motilal Oswal', desc: 'Premium broker with PMS', badges: ['Stocks', 'PMS', 'F&O'], logoUrl: 'https://www.google.com/s2/favicons?domain=motilaloswal.com&sz=128', devUrl: 'https://www.motilaloswal.com/', docsUrl: 'https://www.motilaloswal.com/', supportsOtp: true, supportsApi: false },
   { id: 'icici', name: 'ICICI Direct', desc: 'Full-service broking', badges: ['Stocks', 'MF', 'Bonds'], logoUrl: 'https://www.google.com/s2/favicons?domain=icicidirect.com&sz=128', devUrl: 'https://www.icicidirect.com/', docsUrl: 'https://www.icicidirect.com/', supportsOtp: true, supportsApi: false },
   { id: 'hdfc', name: 'HDFC Securities', desc: 'Bank-backed brokerage', badges: ['Stocks', 'MF', 'IPO'], logoUrl: 'https://www.google.com/s2/favicons?domain=hdfcsec.com&sz=128', devUrl: 'https://www.hdfcsec.com/', docsUrl: 'https://www.hdfcsec.com/', supportsOtp: true, supportsApi: false },
-  { id: 'kotak', name: 'Kotak Securities', desc: 'Neo trading platform', badges: ['Stocks', 'F&O', 'NeoPlus'], logoUrl: 'https://www.google.com/s2/favicons?domain=kotaksecurities.com&sz=128', devUrl: 'https://www.kotaksecurities.com/', docsUrl: 'https://www.kotaksecurities.com/', supportsOtp: true, supportsApi: false },
+  { id: 'kotak', name: 'Kotak Securities', desc: 'Neo trading platform', badges: ['Stocks', 'F&O', 'NeoPlus'], logoUrl: 'https://www.google.com/s2/favicons?domain=kotakneo.com&sz=128', devUrl: 'https://www.kotaksecurities.com/', docsUrl: 'https://www.kotaksecurities.com/', supportsOtp: true, supportsApi: false },
 ];
 
 type OtpStep = 'phone' | 'otp' | 'verifying' | 'done';
@@ -476,19 +478,21 @@ const ConnectBroker = () => {
 
         {/* ── HEADER ── */}
         <div style={{ marginBottom: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <img
-              src="/nextbull-logo.jpg"
-              alt="NextBull"
-              style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover' }}
-            />
-            <h1 style={{ fontSize: 28, fontWeight: 700, color: TV.text, letterSpacing: '-0.02em' }}>
-              Broker Connections
-            </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <NextBullLogo size="sm" glow animated showText={false} />
+            <div>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: '#60a5fa', letterSpacing: '0.04em', fontFamily: 'monospace', textShadow: '0 0 12px rgba(59,130,246,0.4)' }}>
+                BROKER CONNECTIONS
+              </h1>
+              <p style={{ fontSize: 12, color: '#6b7280', marginTop: 2, fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+                CONNECT YOUR BROKER ACCOUNT TO TRADE DIRECTLY FROM <span style={{ color: '#60a5fa', textShadow: '0 0 8px rgba(59,130,246,0.3)' }}>NEXTBULL GPT</span>
+              </p>
+            </div>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, padding: '4px 12px', borderRadius: 999, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px rgba(16,185,129,0.4)' }} />
+              <span style={{ fontSize: 10, color: '#10b981', fontWeight: 700, fontFamily: 'monospace' }}>SECURE</span>
+            </div>
           </div>
-          <p style={{ fontSize: 13, color: TV.textSecondary, marginTop: 4 }}>
-            Connect your broker account to trade directly from NextBull GPT
-          </p>
         </div>
 
         {/* ── SEARCH + TABS ── */}
@@ -591,22 +595,29 @@ const ConnectBroker = () => {
 
                 {/* CTA */}
                 {isConnected ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 11, color: TV.textSecondary }}>
-                      {conn?.user_name || conn?.broker_user_id || 'Connected'}
-                    </span>
-                    <button
-                      onClick={e => { e.stopPropagation(); handleDisconnect(broker.id); }}
-                      style={{
-                        fontSize: 11, fontWeight: 600, color: TV.danger, background: 'transparent',
-                        border: `1px solid ${TV.danger}33`, borderRadius: 4, padding: '4px 10px',
-                        cursor: 'pointer', transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${TV.danger}15`; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                    >
-                      Disconnect
-                    </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 11, color: TV.textSecondary }}>
+                        {conn?.user_name || conn?.broker_user_id || 'Connected'}
+                      </span>
+                      <button
+                        onClick={e => { e.stopPropagation(); handleDisconnect(broker.id); }}
+                        style={{
+                          fontSize: 11, fontWeight: 600, color: TV.danger, background: 'transparent',
+                          border: `1px solid ${TV.danger}33`, borderRadius: 4, padding: '4px 10px',
+                          cursor: 'pointer', transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${TV.danger}15`; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                    {broker.id === 'delta' && (
+                      <div onClick={e => e.stopPropagation()} style={{ cursor: 'default' }}>
+                        <DeltaAccountSummary />
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <button

@@ -97,9 +97,12 @@ const Auth = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <TrendingUp className="w-10 h-10 text-primary" />
-            <h1 className="text-3xl font-bold text-primary">NextBull GPT</h1>
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <TrendingUp className="w-10 h-10 text-blue-500 drop-shadow-[0_0_12px_rgba(59,130,246,0.5)]" />
+            <h1 className="text-3xl font-black">
+              <span className="bg-gradient-to-r from-blue-400 via-white to-blue-400 bg-clip-text text-transparent drop-shadow-[0_0_16px_rgba(59,130,246,0.5)]">NextBull</span>{' '}
+              <span className="bg-gradient-to-r from-blue-300 to-indigo-500 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(99,102,241,0.5)]">GPT</span>
+            </h1>
           </div>
           <p className="text-muted-foreground">Your AI-powered trading intelligence platform</p>
         </div>

@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.delta-trade]
 verify_jwt = false
+
+[functions.delta-account]
+verify_jwt = false
+
+[functions.nextbull-chat]
+verify_jwt = false

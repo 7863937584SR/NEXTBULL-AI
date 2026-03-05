@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 
 export const TopMovers = () => {
     const [activeTab, setActiveTab] = useState<'gainers' | 'losers'>('gainers');
-    const [isAutoRefresh, setIsAutoRefresh] = useState(true);
+    const [isAutoRefresh, setIsAutoRefresh] = useState(false);
 
     const gainersQuery = useQuery({
         queryKey: ['nse-gainers'],

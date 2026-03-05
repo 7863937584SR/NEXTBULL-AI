@@ -7,7 +7,7 @@ export const LiveMarketTicker = () => {
     const { data: indices, isLoading, isError } = useQuery({
         queryKey: ['nse-indices'],
         queryFn: fetchMarketIndices,
-        refetchInterval: 5000,
+        refetchInterval: false,
         retry: 1,
     });
 
@@ -31,18 +31,21 @@ export const LiveMarketTicker = () => {
     const filteredIndices = indices.filter((idx: any) => keyIndices.includes(idx.index));
 
     return (
-        <div className="w-full bg-secondary/20 border-y border-border/40 overflow-hidden flex items-center group/ticker">
-            <div className="flex animate-marquee group-hover/ticker:[animation-play-state:paused] whitespace-nowrap py-2 min-w-full">
+        <div className="w-full bg-[#080808] border-y border-emerald-500/10 overflow-hidden flex items-center group/ticker">
+            <div className="flex animate-marquee group-hover/ticker:[animation-play-state:paused] whitespace-nowrap py-2.5 min-w-full">
                 {filteredIndices.map((idx: any, i) => {
                     const isPositive = idx.percentChange >= 0;
                     return (
-                        <div key={`${idx.index}-${i}`} className="flex items-center mx-6 gap-2">
-                            <span className="text-xs font-bold text-foreground opacity-90">{idx.index}</span>
-                            <span className="text-xs font-mono font-medium">{idx.last.toLocaleString('en-IN')}</span>
-                            <span className={`flex items-center text-xs font-mono font-bold ${isPositive ? 'text-success' : 'text-destructive'}`}>
-                                {isPositive ? <ArrowUpIcon className="w-3 h-3 mr-0.5" /> : <ArrowDownIcon className="w-3 h-3 mr-0.5" />}
-                                {Math.abs(idx.percentChange).toFixed(2)}%
+                        <div key={`${idx.index}-${i}`} className="flex items-center mx-6 gap-2.5">
+                            <span className="text-[11px] font-bold text-gray-300 tracking-wider font-mono">{idx.index}</span>
+                            <span className="text-[11px] font-mono font-semibold text-white/90 tabular-nums">
+                                {idx.last.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
+                            <span className={`flex items-center text-[11px] font-mono font-bold tabular-nums ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {isPositive ? <ArrowUpIcon className="w-3 h-3 mr-0.5" strokeWidth={3} /> : <ArrowDownIcon className="w-3 h-3 mr-0.5" strokeWidth={3} />}
+                                {isPositive ? '+' : '-'}{Math.abs(idx.percentChange).toFixed(2)}%
+                            </span>
+                            <span className="text-gray-700 text-xs">│</span>
                         </div>
                     );
                 })}
@@ -50,13 +53,16 @@ export const LiveMarketTicker = () => {
                 {filteredIndices.map((idx: any, i) => {
                     const isPositive = idx.percentChange >= 0;
                     return (
-                        <div key={`${idx.index}-copy-${i}`} className="flex items-center mx-6 gap-2">
-                            <span className="text-xs font-bold text-foreground opacity-90">{idx.index}</span>
-                            <span className="text-xs font-mono font-medium">{idx.last.toLocaleString('en-IN')}</span>
-                            <span className={`flex items-center text-xs font-mono font-bold ${isPositive ? 'text-success' : 'text-destructive'}`}>
-                                {isPositive ? <ArrowUpIcon className="w-3 h-3 mr-0.5" /> : <ArrowDownIcon className="w-3 h-3 mr-0.5" />}
-                                {Math.abs(idx.percentChange).toFixed(2)}%
+                        <div key={`${idx.index}-copy-${i}`} className="flex items-center mx-6 gap-2.5">
+                            <span className="text-[11px] font-bold text-gray-300 tracking-wider font-mono">{idx.index}</span>
+                            <span className="text-[11px] font-mono font-semibold text-white/90 tabular-nums">
+                                {idx.last.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
+                            <span className={`flex items-center text-[11px] font-mono font-bold tabular-nums ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {isPositive ? <ArrowUpIcon className="w-3 h-3 mr-0.5" strokeWidth={3} /> : <ArrowDownIcon className="w-3 h-3 mr-0.5" strokeWidth={3} />}
+                                {isPositive ? '+' : '-'}{Math.abs(idx.percentChange).toFixed(2)}%
+                            </span>
+                            <span className="text-gray-700 text-xs">│</span>
                         </div>
                     );
                 })}

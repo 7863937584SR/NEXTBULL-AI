@@ -243,7 +243,7 @@ const Sentimental = () => {
     if (!node) return;
     node.innerHTML = '';
     const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-single-quote.js';
+    script.src = '/tv-widget/external-embedding/embed-widget-single-quote.js';
     script.async = true;
     script.innerHTML = JSON.stringify({
       symbol: 'NSE:INDIAVIX',
