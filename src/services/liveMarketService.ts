@@ -136,18 +136,7 @@ export const fetchLiveRates = async (): Promise<LiveRates> => {
     };
   } catch (error) {
     console.error('Failed to fetch live rates:', error);
-    return {
-      usdInr: { rate: 83.25, change: 0.12, changePercent: 0.14 },
-      eurUsd: { rate: 1.0847, change: -0.001, changePercent: -0.09 },
-      gbpUsd: { rate: 1.2654, change: 0.002, changePercent: 0.16 },
-      btcUsd: { rate: 43650, change: 850, changePercent: 1.98 },
-      ethUsd: { rate: 2345, change: -45, changePercent: -1.88 },
-      solUsd: { rate: 145, change: 4.5, changePercent: 3.2 },
-      nifty: { value: 21850, change: 125, changePercent: 0.57 },
-      sensex: { value: 73745, change: 320, changePercent: 0.44 },
-      bankNifty: { value: 47890, change: -85, changePercent: -0.18 },
-      vix: { value: 14.25, change: 0.3, changePercent: 2.15 },
-    };
+    throw new Error('Unable to fetch live market rates. Please check your connection.');
   }
 };
 

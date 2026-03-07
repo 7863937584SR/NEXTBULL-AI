@@ -88,15 +88,15 @@ export const fetchDetailedForexRates = async (): Promise<DetailedForexRate[]> =>
         const change = currentRate - previousRate;
         const changePercent = ((change / previousRate) * 100);
         
-        // Simulate realistic bid/ask spread (0.1-0.3% typical for majors)
-        const spread = currency === 'INR' ? 0.002 : 0.001; // INR has wider spread
+        // Realistic bid/ask spread based on currency liquidity
+        const spread = currency === 'INR' ? 0.002 : currency === 'JPY' ? 0.0008 : 0.001;
         const bid = currentRate * (1 - spread);
         const ask = currentRate * (1 + spread);
         
-        // Simulate daily high/low (±0.5-2% range)
-        const volatility = currency === 'INR' ? 0.015 : 0.008;
-        const high = currentRate * (1 + Math.random() * volatility);
-        const low = currentRate * (1 - Math.random() * volatility);
+        // Derive high/low from current and previous rates (real range approximation)
+        const absChange = Math.abs(change);
+        const high = Math.max(currentRate, previousRate) + absChange * 0.3;
+        const low = Math.min(currentRate, previousRate) - absChange * 0.3;
         
         return {
           pair: `USD/${currency}`,
@@ -107,7 +107,7 @@ export const fetchDetailedForexRates = async (): Promise<DetailedForexRate[]> =>
           ask,
           high,
           low,
-          volume: currency === 'INR' ? '2.8B' : currency === 'EUR' ? '1.2B' : '890M'
+          volume: '--' // Real volume requires premium data feed
         };
       });
   } catch (error) {

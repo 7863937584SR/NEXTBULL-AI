@@ -1,21 +1,71 @@
-import { Activity, TrendingUp, Globe, BarChart3, Terminal, Zap, Database } from 'lucide-react';
+import { Activity, TrendingUp, Globe, BarChart3, Terminal, Zap, Database, Clock, Wifi, WifiOff } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { LiveMarketTicker } from '@/components/dashboard/LiveMarketTicker';
 import { TVLazyWidget } from '@/components/dashboard/TVLazyWidget';
 import { LiveIndexCard } from '@/components/dashboard/LiveIndexCard';
 import GlobalMarketsWidget from '@/components/dashboard/GlobalMarketsWidget';
 import DeltaPromptTrade from '@/components/trading/DeltaPromptTrade';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { NextBullLogo } from '@/components/NextBullLogo';
+import { getAllMarketStatuses, type MarketStatusInfo } from '@/services/marketStatusService';
+import { useQuery } from '@tanstack/react-query';
+import { fetchLiveRates } from '@/services/liveMarketService';
 
 const TVUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
+/** Status badge color mapping (Tailwind classes don't work with dynamic template literals) */
+const STATUS_STYLES: Record<string, { border: string; text: string; dot: string }> = {
+  emerald: {
+    border: 'border-emerald-500/20',
+    text: 'text-emerald-400',
+    dot: 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.6)]',
+  },
+  red: {
+    border: 'border-red-500/20',
+    text: 'text-red-400',
+    dot: 'bg-red-400/50',
+  },
+  amber: {
+    border: 'border-amber-500/20',
+    text: 'text-amber-400',
+    dot: 'bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.6)]',
+  },
+  purple: {
+    border: 'border-purple-500/20',
+    text: 'text-purple-400',
+    dot: 'bg-purple-400 shadow-[0_0_6px_rgba(168,85,247,0.6)]',
+  },
+  cyan: {
+    border: 'border-cyan-500/20',
+    text: 'text-cyan-400',
+    dot: 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]',
+  },
+};
+
 export default function Markets() {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [marketStatuses, setMarketStatuses] = useState<MarketStatusInfo[]>(() => getAllMarketStatuses());
+  const [latency, setLatency] = useState<number | null>(null);
 
+  // Live data feed — measure actual API latency
+  const { data: liveRates, dataUpdatedAt, isFetching } = useQuery({
+    queryKey: ['markets-live-rates'],
+    queryFn: async () => {
+      const start = performance.now();
+      const result = await fetchLiveRates();
+      setLatency(Math.round(performance.now() - start));
+      return result;
+    },
+    refetchInterval: 30000,
+    retry: 2,
+  });
+
+  // Update clock + market status every second
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(new Date());
+      const now = new Date();
+      setCurrentTime(now);
+      setMarketStatuses(getAllMarketStatuses(now));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -38,6 +88,10 @@ export default function Markets() {
     container_id: "tradingview_chart"
   }), []);
 
+  // Count how many markets are currently trading
+  const activeCount = marketStatuses.filter(m => m.isTrading).length;
+  const feedStatus = liveRates ? 'LIVE' : isFetching ? 'CONNECTING' : 'OFFLINE';
+
   return (
     <div className="flex-1 overflow-auto bg-[#050505] custom-scrollbar">
       {/* Terminal Header */}
@@ -50,18 +104,39 @@ export default function Markets() {
                 <h1 className="text-xl font-bold text-emerald-400 font-mono tracking-wider drop-shadow-[0_0_12px_rgba(16,185,129,0.3)]">GLOBAL MARKETS TERMINAL</h1>
               </div>
               <div className="flex items-center gap-3 text-xs font-mono">
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-                  <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full shadow-[0_0_6px_rgba(16,185,129,0.4)]"></div>
-                  <span className="text-emerald-400 font-bold text-[10px]">LIVE FEED</span>
+                {/* Live feed status — reflects actual data */}
+                <div className={`flex items-center gap-1.5 px-2 py-1 border rounded-full ${
+                  feedStatus === 'LIVE'
+                    ? 'bg-emerald-500/10 border-emerald-500/20'
+                    : feedStatus === 'CONNECTING'
+                    ? 'bg-amber-500/10 border-amber-500/20'
+                    : 'bg-red-500/10 border-red-500/20'
+                }`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${
+                    feedStatus === 'LIVE'
+                      ? 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.4)] animate-pulse'
+                      : feedStatus === 'CONNECTING'
+                      ? 'bg-amber-400 animate-pulse'
+                      : 'bg-red-400'
+                  }`} />
+                  <span className={`font-bold text-[10px] ${
+                    feedStatus === 'LIVE' ? 'text-emerald-400' : feedStatus === 'CONNECTING' ? 'text-amber-400' : 'text-red-400'
+                  }`}>{feedStatus === 'LIVE' ? 'LIVE FEED' : feedStatus === 'CONNECTING' ? 'CONNECTING...' : 'OFFLINE'}</span>
                 </div>
+                {/* Active markets count */}
                 <div className="flex items-center gap-1 text-cyan-400/60 text-[10px]">
-                  <Database className="w-3 h-3" />
-                  <span>RT DATA</span>
+                  {liveRates ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                  <span>{activeCount}/5 ACTIVE</span>
                 </div>
-                <div className="flex items-center gap-1 text-purple-400/60 text-[10px]">
-                  <Zap className="w-3 h-3" />
-                  <span>15ms</span>
-                </div>
+                {/* Real latency measurement */}
+                {latency !== null && (
+                  <div className={`flex items-center gap-1 text-[10px] ${
+                    latency < 500 ? 'text-emerald-400/60' : latency < 2000 ? 'text-amber-400/60' : 'text-red-400/60'
+                  }`}>
+                    <Zap className="w-3 h-3" />
+                    <span>{latency}ms</span>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -77,20 +152,21 @@ export default function Markets() {
             </div>
           </div>
 
-          {/* Market Status Indicators */}
+          {/* Market Status Indicators — Real-time calculated */}
           <div className="grid grid-cols-5 gap-2 text-xs font-mono">
-            {[
-              { label: 'NSE', status: 'OPEN', color: 'emerald' },
-              { label: 'BSE', status: 'ACTIVE', color: 'cyan' },
-              { label: 'NYSE', status: 'PRE-MKT', color: 'purple' },
-              { label: 'LSE', status: 'OPEN', color: 'amber' },
-              { label: 'CRYPTO', status: '24/7', color: 'cyan' },
-            ].map((m) => (
-              <div key={m.label} className={`rounded-lg p-2 text-center bg-[#0d0d0d] border border-${m.color}-500/15`}>
-                <div className="text-gray-500 text-[10px] mb-0.5">{m.label}</div>
-                <div className={`text-${m.color}-400 font-bold text-[11px]`}>{m.status}</div>
-              </div>
-            ))}
+            {marketStatuses.map((m) => {
+              const styles = STATUS_STYLES[m.color] || STATUS_STYLES.red;
+              return (
+                <div key={m.label} className={`rounded-lg p-2 text-center bg-[#0d0d0d] border ${styles.border} transition-all`}>
+                  <div className="text-gray-500 text-[10px] mb-0.5">{m.label}</div>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <div className={`w-1.5 h-1.5 rounded-full ${styles.dot} ${m.isTrading ? 'animate-pulse' : ''}`} />
+                    <span className={`${styles.text} font-bold text-[11px]`}>{m.status}</span>
+                  </div>
+                  <div className="text-gray-600 text-[9px] mt-0.5 truncate" title={m.nextEvent}>{m.nextEvent}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -102,16 +178,22 @@ export default function Markets() {
 
       <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-[1600px] mx-auto bg-[#050505]">
         
-        {/* Command Line Interface */}
+        {/* Live Terminal Status — real data */}
         <div className="card-terminal border border-emerald-500/10 rounded-lg p-4 font-mono text-sm bg-[#0a0a0a]">
           <div className="text-emerald-400/80 mb-2">
             <span className="text-amber-400/80">user@nextbull:~$</span> markets --live --feed=real-time
           </div>
-          <div className="text-gray-600 text-xs">
-            ➤ Initializing market data streams...<br/>
-            ➤ Connected to NSE, BSE, NYSE, NASDAQ<br/>
-            ➤ Real-time feed active - 15ms latency<br/>
-            ➤ <span className="text-emerald-400/60">Ready for trading operations</span>
+          <div className="text-gray-600 text-xs space-y-0.5">
+            <div>➤ {feedStatus === 'LIVE' ? (
+              <span className="text-emerald-400/60">Data feed connected — last update {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('en-US', { hour12: false }) : '...'}</span>
+            ) : (
+              <span className="text-amber-400/60">Connecting to market data feeds...</span>
+            )}</div>
+            <div>➤ Markets active: {marketStatuses.filter(m => m.isTrading).map(m => m.label).join(', ') || 'None (all closed)'}</div>
+            <div>➤ Markets closed: {marketStatuses.filter(m => !m.isTrading).map(m => m.label).join(', ') || 'None (all open)'}</div>
+            {latency !== null && <div>➤ API latency: <span className={latency < 500 ? 'text-emerald-400/60' : 'text-amber-400/60'}>{latency}ms</span></div>}
+            {liveRates && <div>➤ NIFTY: {liveRates.nifty.value.toLocaleString('en-IN', { minimumFractionDigits: 2 })} | SENSEX: {liveRates.sensex.value.toLocaleString('en-IN', { minimumFractionDigits: 2 })} | BTC: ${liveRates.btcUsd.rate.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>}
+            <div>➤ <span className="text-emerald-400/60">Ready for trading operations</span></div>
           </div>
         </div>
 

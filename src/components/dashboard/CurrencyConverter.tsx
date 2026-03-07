@@ -110,8 +110,7 @@ export const CurrencyConverter = ({ className = '' }: CurrencyConverterProps) =>
       
     } catch (error) {
       console.error('Exchange rate fetch failed:', error);
-      // Return mock rate to keep UI functional
-      return Math.random() * 100 + 50; // Random rate for demo
+      throw new Error('Unable to fetch exchange rate. Please try again.');
     }
   };
 

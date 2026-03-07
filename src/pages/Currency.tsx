@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Activity, Globe, TrendingUp, Calculator, BarChart3, Zap, Calendar, Clock, Signal, AlertTriangle, CheckCircle, Bell, Building, BarChart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,7 +9,7 @@ import EnhancedCurrencyDashboard from '@/components/dashboard/EnhancedCurrencyDa
 import CurrencyConverter from '@/components/dashboard/CurrencyConverter';
 import { TVLazyWidget } from '@/components/dashboard/TVLazyWidget';
 import { useQuery } from '@tanstack/react-query';
-import { fetchForexRates } from '@/services/forexService';
+import { fetchForexRates, fetchDetailedForexRates } from '@/services/forexService';
 import { NextBullLogo } from '@/components/NextBullLogo';
 
 const TVUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
@@ -27,17 +27,53 @@ const fetchMarketStatus = async () => {
   };
 };
 
-// Fetch real-time volatility data
+// Fetch real-time volatility data from live forex rates
 const fetchVolatilityData = async () => {
-  // Mock real-time volatility data that would come from a financial API
-  return [
-    { pair: 'EUR/USD', volatility: 12.5, volume: 1.2e9, trend: 'stable' },
-    { pair: 'GBP/USD', volatility: 18.3, volume: 8.5e8, trend: 'volatile' },
-    { pair: 'USD/JPY', volatility: 14.7, volume: 1.1e9, trend: 'rising' },
-    { pair: 'USD/CHF', volatility: 11.2, volume: 6.2e8, trend: 'stable' },
-    { pair: 'AUD/USD', volatility: 16.8, volume: 7.1e8, trend: 'falling' },
-    { pair: 'USD/CAD', volatility: 13.4, volume: 5.9e8, trend: 'stable' },
+  const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+  if (!response.ok) throw new Error('Failed to fetch volatility data');
+  const data = await response.json();
+  const rates = data.rates || {};
+
+  // Get yesterday's rates for real change calculation
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  let histRates: Record<string, number> = {};
+  try {
+    const histRes = await fetch(`https://api.frankfurter.app/${yesterday.toISOString().split('T')[0]}`);
+    if (histRes.ok) {
+      const histData = await histRes.json();
+      histRates = histData.rates || {};
+    }
+  } catch {}
+
+  const pairs = [
+    { from: 'EUR', to: 'USD' },
+    { from: 'GBP', to: 'USD' },
+    { from: 'USD', to: 'JPY' },
+    { from: 'USD', to: 'CHF' },
+    { from: 'AUD', to: 'USD' },
+    { from: 'USD', to: 'CAD' },
   ];
+
+  return pairs.map(({ from, to }) => {
+    const cur = to === 'USD' ? (1 / (rates[from] || 1)) : (rates[to] || 1);
+    const prev = to === 'USD'
+      ? (1 / (histRates[from] || rates[from] || 1))
+      : (histRates[to] || rates[to] || 1);
+    const changePct = prev ? Math.abs(((cur - prev) / prev) * 100) : 0;
+    // Derive volatility from actual price change (annualized approximation)
+    const volatility = changePct * Math.sqrt(252);
+    const trend = cur > prev ? 'rising' : cur < prev ? 'falling' : 'stable';
+    return {
+      pair: `${from}/${to}`,
+      volatility: Math.round(volatility * 10) / 10,
+      volume: 0, // Real volume requires premium feed
+      trend,
+      rate: cur,
+      change: cur - prev,
+      changePct: ((cur - prev) / prev) * 100,
+    };
+  });
 };
 
 export default function CurrencyPage() {
@@ -58,6 +94,13 @@ export default function CurrencyPage() {
     refetchInterval: 30000,
   });
 
+  // Live detailed forex rates for FX pairs section
+  const { data: detailedRates, isLoading: ratesLoading } = useQuery({
+    queryKey: ['detailed-forex-rates'],
+    queryFn: fetchDetailedForexRates,
+    refetchInterval: 30000,
+  });
+
   // Update market time every second
   useEffect(() => {
     const timer = setInterval(() => {
@@ -65,6 +108,25 @@ export default function CurrencyPage() {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Calculate real forex session statuses based on current UTC time
+  const forexSessions = useMemo(() => {
+    const now = marketTime;
+    const utcH = now.getUTCHours() + now.getUTCMinutes() / 60;
+    // Sessions in UTC: Sydney 21:00-06:00, Tokyo 00:00-09:00, London 07:00-16:00, New York 12:00-21:00
+    const isSydney = utcH >= 21 || utcH < 6;
+    const isTokyo = utcH >= 0 && utcH < 9;
+    const isLondon = utcH >= 7 && utcH < 16;
+    const isNewYork = utcH >= 12 && utcH < 21;
+    return [
+      { name: 'Sydney', active: isSydney, time: '21:00-06:00 UTC', color: isSydney ? 'cyan' : 'gray' },
+      { name: 'Tokyo', active: isTokyo, time: '00:00-09:00 UTC', color: isTokyo ? 'cyan' : 'gray' },
+      { name: 'London', active: isLondon, time: '07:00-16:00 UTC', color: isLondon ? 'emerald' : 'gray' },
+      { name: 'New York', active: isNewYork, time: '12:00-21:00 UTC', color: isNewYork ? 'purple' : 'gray' },
+    ];
+  }, [marketTime]);
+
+  const activeSessions = forexSessions.filter(s => s.active).length;
 
   return (
     <div className="min-h-screen bg-[#050505] text-emerald-400 font-mono">
@@ -130,7 +192,9 @@ export default function CurrencyPage() {
                   <Activity className="w-3 h-3 text-purple-400" />
                   <span className="text-[10px] font-semibold text-purple-400/80">VOLATILITY</span>
                 </div>
-                <div className="text-lg font-bold text-purple-400">14.2%</div>
+                <div className="text-lg font-bold text-purple-400">
+                  {volatilityLoading ? '...' : volatilityData ? `${(volatilityData.reduce((a, v) => a + v.volatility, 0) / volatilityData.length).toFixed(1)}%` : '--'}
+                </div>
                 <div className="text-[10px] text-gray-500">Daily Average</div>
               </div>
               
@@ -144,21 +208,16 @@ export default function CurrencyPage() {
               </div>
             </div>
               
-            {/* Trading Sessions Bar */}
+            {/* Trading Sessions Bar — Live */}
             <div className="rounded-lg p-3 border border-emerald-500/10 bg-[#0d0d0d]">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-4">
                   <span className="text-[10px] font-semibold text-gray-500 tracking-wider">SESSIONS:</span>
-                  {[
-                    { name: 'Sydney', active: false, time: '22:00-07:00', color: 'gray' },
-                    { name: 'Tokyo', active: true, time: '00:00-09:00', color: 'cyan' },
-                    { name: 'London', active: true, time: '08:00-17:00', color: 'emerald' },
-                    { name: 'New York', active: false, time: '13:00-22:00', color: 'purple' }
-                  ].map(session => (
+                  {forexSessions.map(session => (
                     <div key={session.name} className="flex items-center gap-1.5">
                       <div className={`w-1.5 h-1.5 rounded-full ${
                         session.active 
-                          ? `bg-${session.color}-400 shadow-[0_0_4px_rgba(16,185,129,0.3)]` 
+                          ? `bg-${session.color}-400 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse` 
                           : 'bg-gray-600'
                       }`} />
                       <span className={`text-[10px] font-medium ${
@@ -170,7 +229,7 @@ export default function CurrencyPage() {
                   ))}
                 </div>
                 <div className="text-[10px] text-gray-500">
-                  VOL: $7.5T • SPREAD: 0.8-2.1 • LIQ: HIGH
+                  {activeSessions}/4 SESSIONS ACTIVE • FX MARKET {activeSessions > 0 ? 'OPEN' : 'LOW ACTIVITY'}
                 </div>
               </div>
             </div>
@@ -229,8 +288,10 @@ export default function CurrencyPage() {
                       <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 relative overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent" />
                         <div className="relative">
-                          <div className="text-xl font-bold text-emerald-400 font-mono">$7.5T</div>
-                          <div className="text-xs text-slate-400">Daily FX Volume</div>
+                          <div className="text-xl font-bold text-emerald-400 font-mono">
+                            {activeSessions}/4
+                          </div>
+                          <div className="text-xs text-slate-400">Sessions Active</div>
                           <div className="text-[10px] text-emerald-500 flex items-center gap-1 mt-1">
                             <CheckCircle className="w-2 h-2" />
                             Live
@@ -276,11 +337,18 @@ export default function CurrencyPage() {
                     <div className="mt-4 p-3 rounded-lg bg-slate-700/30 border border-slate-600/30">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-semibold text-slate-300">Market Volatility</span>
-                        <Badge variant="secondary" className="bg-amber-500/20 text-amber-300 text-xs">
-                          {volatilityLoading ? 'Loading...' : 'Moderate'}
-                        </Badge>
+                        {(() => {
+                          const avg = volatilityData ? volatilityData.reduce((a, v) => a + v.volatility, 0) / volatilityData.length : 0;
+                          const label = avg > 20 ? 'High' : avg > 10 ? 'Moderate' : 'Low';
+                          const color = avg > 20 ? 'bg-red-500/20 text-red-300' : avg > 10 ? 'bg-amber-500/20 text-amber-300' : 'bg-green-500/20 text-green-300';
+                          return (
+                            <Badge variant="secondary" className={`${color} text-xs`}>
+                              {volatilityLoading ? 'Loading...' : label}
+                            </Badge>
+                          );
+                        })()}
                       </div>
-                      <Progress value={68} className="h-2 bg-slate-700" />
+                      <Progress value={volatilityData ? Math.min(volatilityData.reduce((a, v) => a + v.volatility, 0) / volatilityData.length * 3, 100) : 0} className="h-2 bg-slate-700" />
                       <div className="flex justify-between text-xs text-slate-400 mt-1">
                         <span>Low</span>
                         <span>High</span>
@@ -295,19 +363,24 @@ export default function CurrencyPage() {
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Globe className="w-5 h-5 text-blue-500" />
                       Major FX Pairs
+                      <Badge variant="secondary" className="ml-auto bg-emerald-500/20 text-emerald-300 text-xs">
+                        {ratesLoading ? 'Loading...' : 'Live'}
+                      </Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {[
-                        { pair: 'EUR/USD', rate: 1.0847, change: '+0.0012', changePercent: '+0.11%', volume: '€1.2B', trend: 'up', session: 'London' },
-                        { pair: 'GBP/USD', rate: 1.2654, change: '-0.0018', changePercent: '-0.14%', volume: '£890M', trend: 'down', session: 'London' },
-                        { pair: 'USD/JPY', rate: 149.85, change: '+0.24', changePercent: '+0.16%', volume: '¥1.1B', trend: 'up', session: 'Tokyo' },
-                        { pair: 'USD/CHF', rate: 0.8892, change: '+0.0008', changePercent: '+0.09%', volume: 'CHF520M', trend: 'up', session: 'Zurich' },
-                        { pair: 'AUD/USD', rate: 0.6612, change: '-0.0024', changePercent: '-0.36%', volume: 'A$670M', trend: 'down', session: 'Sydney' },
-                        { pair: 'USD/CAD', rate: 1.3521, change: '+0.0015', changePercent: '+0.11%', volume: 'C$580M', trend: 'up', session: 'Toronto' },
-                      ].map(item => {
-                        const isPositive = item.trend === 'up';
+                      {ratesLoading ? (
+                        [...Array(6)].map((_, i) => (
+                          <div key={i} className="p-3 rounded-lg border border-slate-600/30 bg-slate-700/20 animate-pulse">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-2"><div className="h-4 w-20 bg-slate-600 rounded" /><div className="h-3 w-16 bg-slate-600 rounded" /></div>
+                              <div className="space-y-2"><div className="h-4 w-16 bg-slate-600 rounded" /><div className="h-3 w-12 bg-slate-600 rounded" /></div>
+                            </div>
+                          </div>
+                        ))
+                      ) : detailedRates?.slice(0, 6).map(item => {
+                        const isPositive = item.changePercent >= 0;
                         return (
                           <div key={item.pair} className={`p-3 rounded-lg border transition-all duration-200 hover:scale-[1.01] ${
                             isPositive 
@@ -322,19 +395,19 @@ export default function CurrencyPage() {
                                 <div>
                                   <div className="font-bold text-sm">{item.pair}</div>
                                   <div className="text-xs text-slate-400 flex items-center gap-2">
-                                    <span>{item.session}</span>
+                                    <span>Bid: {item.bid.toFixed(4)}</span>
                                     <span>•</span>
-                                    <span>{item.volume}</span>
+                                    <span>Ask: {item.ask.toFixed(4)}</span>
                                   </div>
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="font-mono text-sm font-bold">{item.rate}</div>
+                                <div className="font-mono text-sm font-bold">{item.rate.toFixed(item.pair.includes('JPY') ? 2 : 4)}</div>
                                 <div className={`text-xs font-semibold ${
                                   isPositive ? 'text-emerald-400' : 'text-rose-400'
                                 }`}>
-                                  <span>{item.change}</span>
-                                  <span className="ml-1">({item.changePercent})</span>
+                                  <span>{isPositive ? '+' : ''}{item.change.toFixed(4)}</span>
+                                  <span className="ml-1">({isPositive ? '+' : ''}{item.changePercent.toFixed(2)}%)</span>
                                 </div>
                               </div>
                             </div>
@@ -343,7 +416,7 @@ export default function CurrencyPage() {
                             <div className="mt-2 h-1 rounded-full bg-slate-700 overflow-hidden">
                               <div className={`h-full transition-all duration-1000 ${
                                 isPositive ? 'bg-emerald-500' : 'bg-rose-500'
-                              }`} style={{ width: `${Math.abs(parseFloat(item.changePercent.replace('%', '').replace('+', ''))) * 20 + 20}%` }} />
+                              }`} style={{ width: `${Math.min(Math.abs(item.changePercent) * 20 + 20, 100)}%` }} />
                             </div>
                           </div>
                         );
@@ -456,29 +529,41 @@ export default function CurrencyPage() {
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Volatility Grid */}
+                {/* Volatility Grid — from live data */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card className="bg-red-500/5 border-red-500/20">
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-red-500">18.4%</div>
-                      <div className="text-sm text-muted-foreground">High Risk Pairs</div>
-                      <div className="text-xs text-red-400 mt-1">EUR/TRY, GBP/JPY</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-orange-500/5 border-orange-500/20">
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-orange-500">12.7%</div>
-                      <div className="text-sm text-muted-foreground">Medium Risk Pairs</div>
-                      <div className="text-xs text-orange-400 mt-1">AUD/USD, CAD/JPY</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-green-500/5 border-green-500/20">
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-green-500">7.2%</div>
-                      <div className="text-sm text-muted-foreground">Low Risk Pairs</div>
-                      <div className="text-xs text-green-400 mt-1">EUR/USD, USD/CHF</div>
-                    </CardContent>
-                  </Card>
+                  {(() => {
+                    const high = volatilityData?.filter(v => v.volatility > 15) || [];
+                    const medium = volatilityData?.filter(v => v.volatility > 8 && v.volatility <= 15) || [];
+                    const low = volatilityData?.filter(v => v.volatility <= 8) || [];
+                    const avgHigh = high.length ? (high.reduce((a, v) => a + v.volatility, 0) / high.length).toFixed(1) : '--';
+                    const avgMed = medium.length ? (medium.reduce((a, v) => a + v.volatility, 0) / medium.length).toFixed(1) : '--';
+                    const avgLow = low.length ? (low.reduce((a, v) => a + v.volatility, 0) / low.length).toFixed(1) : '--';
+                    return (
+                      <>
+                        <Card className="bg-red-500/5 border-red-500/20">
+                          <CardContent className="p-4 text-center">
+                            <div className="text-2xl font-bold text-red-500">{volatilityLoading ? '...' : `${avgHigh}%`}</div>
+                            <div className="text-sm text-muted-foreground">High Risk Pairs</div>
+                            <div className="text-xs text-red-400 mt-1">{high.map(v => v.pair).join(', ') || 'None'}</div>
+                          </CardContent>
+                        </Card>
+                        <Card className="bg-orange-500/5 border-orange-500/20">
+                          <CardContent className="p-4 text-center">
+                            <div className="text-2xl font-bold text-orange-500">{volatilityLoading ? '...' : `${avgMed}%`}</div>
+                            <div className="text-sm text-muted-foreground">Medium Risk Pairs</div>
+                            <div className="text-xs text-orange-400 mt-1">{medium.map(v => v.pair).join(', ') || 'None'}</div>
+                          </CardContent>
+                        </Card>
+                        <Card className="bg-green-500/5 border-green-500/20">
+                          <CardContent className="p-4 text-center">
+                            <div className="text-2xl font-bold text-green-500">{volatilityLoading ? '...' : `${avgLow}%`}</div>
+                            <div className="text-sm text-muted-foreground">Low Risk Pairs</div>
+                            <div className="text-xs text-green-400 mt-1">{low.map(v => v.pair).join(', ') || 'None'}</div>
+                          </CardContent>
+                        </Card>
+                      </>
+                    );
+                  })()}
                 </div>
                 
                 {/* Risk Factors */}
@@ -520,24 +605,45 @@ export default function CurrencyPage() {
                       <div className="p-4 rounded-lg bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-green-500/20">
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-medium">Overall Market Sentiment</span>
-                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Risk-On</Badge>
+                          {(() => {
+                            const avgChange = volatilityData ? volatilityData.reduce((a, v) => a + (v.changePct || 0), 0) / volatilityData.length : 0;
+                            const isRiskOn = avgChange > 0;
+                            return (
+                              <Badge className={`${isRiskOn ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
+                                {isRiskOn ? 'Risk-On' : 'Risk-Off'}
+                              </Badge>
+                            );
+                          })()}
                         </div>
                         <div className="w-full bg-gray-700 rounded-full h-2">
-                          <div className="bg-gradient-to-r from-green-500 to-emerald-600 h-2 rounded-full" style={{ width: '68%' }} />
+                          {(() => {
+                            const positive = volatilityData ? volatilityData.filter(v => (v.changePct || 0) > 0).length : 0;
+                            const total = volatilityData?.length || 1;
+                            const pct = Math.round((positive / total) * 100);
+                            return (
+                              <>
+                                <div className="bg-gradient-to-r from-green-500 to-emerald-600 h-2 rounded-full" style={{ width: `${pct}%` }} />
+                              </>
+                            );
+                          })()}
                         </div>
                         <div className="flex justify-between text-xs text-muted-foreground mt-1">
                           <span>Risk-Off</span>
-                          <span>68% Risk-On</span>
+                          <span>{volatilityData ? `${Math.round((volatilityData.filter(v => (v.changePct || 0) > 0).length / volatilityData.length) * 100)}%` : '--'} Risk-On</span>
                         </div>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-3">
                         <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 text-center">
-                          <div className="text-lg font-bold text-purple-400">+2.4%</div>
+                          <div className="text-lg font-bold text-purple-400">
+                            {volatilityData ? `${volatilityData.filter(v => ['AUD/USD', 'USD/CAD'].includes(v.pair))[0]?.changePct?.toFixed(2) || '--'}%` : '...'}
+                          </div>
                           <div className="text-xs text-muted-foreground">Commodity FX</div>
                         </div>
                         <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-center">
-                          <div className="text-lg font-bold text-cyan-400">-1.1%</div>
+                          <div className="text-lg font-bold text-cyan-400">
+                            {volatilityData ? `${volatilityData.filter(v => ['USD/JPY', 'USD/CHF'].includes(v.pair))[0]?.changePct?.toFixed(2) || '--'}%` : '...'}
+                          </div>
                           <div className="text-xs text-muted-foreground">Safe Havens</div>
                         </div>
                       </div>
@@ -737,15 +843,10 @@ export default function CurrencyPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {[
-                      { session: 'Sydney', status: 'closed', time: '22:00 - 07:00 GMT', activity: 'low', color: 'slate' },
-                      { session: 'Tokyo', status: 'active', time: '00:00 - 09:00 GMT', activity: 'high', color: 'emerald' },
-                      { session: 'London', status: 'opening', time: '08:00 - 17:00 GMT', activity: 'very-high', color: 'blue' },
-                      { session: 'New York', status: 'closed', time: '13:00 - 22:00 GMT', activity: 'high', color: 'slate' },
-                    ].map(session => {
-                      const isActive = session.status === 'active' || session.status === 'opening';
+                    {forexSessions.map(session => {
+                      const isActive = session.active;
                       return (
-                        <div key={session.session} className={`p-3 rounded-lg border transition-all ${
+                        <div key={session.name} className={`p-3 rounded-lg border transition-all ${
                           isActive 
                             ? `bg-${session.color}-500/10 border-${session.color}-500/30` 
                             : 'bg-slate-700/20 border-slate-600/30'
@@ -754,14 +855,14 @@ export default function CurrencyPage() {
                             <div className="flex items-center gap-3">
                               <div className={`w-3 h-3 rounded-full ${
                                 isActive 
-                                  ? `bg-${session.color}-500` 
+                                  ? `bg-${session.color}-500 animate-pulse` 
                                   : 'bg-slate-500'
                               }`} />
                               <div>
                                 <div className={`font-semibold text-sm ${
                                   isActive ? `text-${session.color}-300` : 'text-slate-400'
                                 }`}>
-                                  {session.session}
+                                  {session.name}
                                 </div>
                                 <div className="text-xs text-slate-500">{session.time}</div>
                               </div>
@@ -772,12 +873,12 @@ export default function CurrencyPage() {
                                   ? `bg-${session.color}-500/20 text-${session.color}-300 border-${session.color}-500/30`
                                   : 'bg-slate-600/20 text-slate-400'
                               }`}>
-                                {session.status.toUpperCase()}
+                                {isActive ? 'ACTIVE' : 'CLOSED'}
                               </Badge>
-                              <div className={`text-xs mt-1 capitalize ${
+                              <div className={`text-xs mt-1 ${
                                 isActive ? `text-${session.color}-400` : 'text-slate-500'
                               }`}>
-                                {session.activity.replace('-', ' ')} activity
+                                {isActive ? 'High activity' : 'Session ended'}
                               </div>
                             </div>
                           </div>

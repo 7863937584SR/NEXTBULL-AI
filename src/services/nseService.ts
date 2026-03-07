@@ -113,70 +113,7 @@ export const fetchMarketIndices = async (): Promise<NseIndexData[]> => {
         return response.data.data;
     } catch (error) {
         console.error("Error fetching market indices:", error);
-        
-        // Return fallback data with realistic values
-        return [
-            {
-                index: 'NIFTY 50',
-                last: 21850 + (Math.random() - 0.5) * 200,
-                variation: (Math.random() - 0.5) * 100,
-                percentChange: (Math.random() - 0.5) * 2,
-                open: 21800,
-                high: 21950,
-                low: 21780,
-                previousClose: 21825,
-                yearHigh: 22150,
-                yearLow: 19450,
-            },
-            {
-                index: 'NIFTY BANK',
-                last: 46500 + (Math.random() - 0.5) * 400,
-                variation: (Math.random() - 0.5) * 200,
-                percentChange: (Math.random() - 0.5) * 1.8,
-                open: 46400,
-                high: 46750,
-                low: 46200,
-                previousClose: 46450,
-                yearHigh: 48000,
-                yearLow: 42000,
-            },
-            {
-                index: 'NIFTY IT',
-                last: 29980 + (Math.random() - 0.5) * 300,
-                variation: (Math.random() - 0.5) * 150,
-                percentChange: (Math.random() - 0.5) * 1.5,
-                open: 29900,
-                high: 30100,
-                low: 29800,
-                previousClose: 29950,
-                yearHigh: 31000,
-                yearLow: 27500,
-            },
-            {
-                index: 'NIFTY FIN SERVICE',
-                last: 21200 + (Math.random() - 0.5) * 250,
-                variation: (Math.random() - 0.5) * 120,
-                percentChange: (Math.random() - 0.5) * 1.6,
-                open: 21100,
-                high: 21350,
-                low: 21050,
-                previousClose: 21175,
-                yearHigh: 22000,
-                yearLow: 19000,
-            },
-            {
-                index: 'NIFTY AUTO',
-                last: 18400 + (Math.random() - 0.5) * 200,
-                variation: (Math.random() - 0.5) * 100,
-                percentChange: (Math.random() - 0.5) * 1.4,
-                open: 18350,
-                high: 18500,
-                low: 18250,
-                previousClose: 18380,
-                yearHigh: 19200,
-                yearLow: 16500,
-            },
-        ];
+        throw new Error('Unable to fetch live market indices. Please try again.');
     }
 };
 
