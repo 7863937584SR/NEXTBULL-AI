@@ -17,3 +17,15 @@ verify_jwt = false
 
 [functions.nextbull-chat]
 verify_jwt = false
+
+[functions.yahoo-finance]
+verify_jwt = false
+
+[functions.delta-history]
+verify_jwt = false
+
+[functions.dhan-account]
+verify_jwt = false
+
+[functions.economic-calendar]
+verify_jwt = false

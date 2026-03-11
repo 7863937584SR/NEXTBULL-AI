@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,8 @@ import { TrendingUp, TrendingDown, Activity, RefreshCw, Globe, DollarSign, Zap }
 import { useQuery } from '@tanstack/react-query';
 import { fetchDetailedForexRates, DetailedForexRate } from '@/services/forexService';
 import { fetchTopCryptoMovers, CryptoTicker } from '@/services/cryptoService';
+import { fetchYahooQuotes } from '@/services/yahooClient';
+import { TerminalClock } from '@/components/ui/TerminalClock';
 
 interface CurrencyRate {
   pair: string;
@@ -30,8 +32,6 @@ interface CommodityPrice {
 }
 
 const EnhancedCurrencyDashboard = () => {
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [lastUpdate, setLastUpdate] = useState(new Date());
 
   // Live forex data
   const { data: forexData, isLoading: forexLoading, refetch: refetchForex } = useQuery({
@@ -62,60 +62,64 @@ const EnhancedCurrencyDashboard = () => {
         { name: 'Copper', symbol: 'XCU/USD', yahooSymbol: 'HG=F', unit: '/MT' },
       ];
 
+      const yahooSymbols = commoditySymbols.map(c => c.yahooSymbol);
+      const quotes = await fetchYahooQuotes(yahooSymbols);
       const results: CommodityPrice[] = [];
-      const promises = commoditySymbols.map(async (c) => {
-        try {
-          const res = await fetch(`/api/yahoo/v8/finance/chart/${encodeURIComponent(c.yahooSymbol)}?range=1d&interval=1m`);
-          if (!res.ok) return null;
-          const data = await res.json();
-          const meta = data?.chart?.result?.[0]?.meta;
-          if (!meta) return null;
-          const price = meta.regularMarketPrice ?? meta.previousClose ?? 0;
-          const prevClose = meta.previousClose ?? price;
-          const change = price - prevClose;
-          const changePercent = prevClose ? (change / prevClose) * 100 : 0;
-          return { name: c.name, symbol: c.symbol, price, change, changePercent, unit: c.unit };
-        } catch { return null; }
-      });
 
-      const settled = await Promise.all(promises);
-      for (const r of settled) { if (r) results.push(r); }
+      for (const c of commoditySymbols) {
+        const q = quotes[c.yahooSymbol];
+        if (q) {
+          results.push({
+            name: c.name,
+            symbol: c.symbol,
+            price: q.price,
+            change: q.change,
+            changePercent: q.changePercent,
+            unit: c.unit,
+          });
+        }
+      }
       return results;
     },
     refetchInterval: 60000,
     staleTime: 15000,
   });
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-      setLastUpdate(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const handleRefresh = () => {
-    setLastUpdate(new Date());
+  const handleRefresh = useCallback(() => {
     refetchForex();
     refetchCrypto();
-  };
+  }, [refetchForex, refetchCrypto]);
 
   const isLive = !forexLoading && !cryptoLoading && !commoditiesLoading;
-  const majorPairs = forexData?.filter(pair => ['USD/INR', 'EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD'].includes(pair.pair)) || [];
-  const exoticPairs = forexData?.filter(pair => ['USD/SGD', 'USD/HKD', 'USD/CHF'].includes(pair.pair)) || [];
+
+  const majorPairs = useMemo(() => 
+    forexData?.filter(pair => ['USD/INR', 'EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD'].includes(pair.pair)) || [],
+    [forexData]
+  );
+
+  const exoticPairs = useMemo(() => 
+    forexData?.filter(pair => ['USD/SGD', 'USD/HKD', 'USD/CHF'].includes(pair.pair)) || [],
+    [forexData]
+  );
+
   const commodities = commoditiesData || [];
 
-  // Convert crypto data to commodity format for display
-  const cryptoCommodities: CommodityPrice[] = cryptoData?.slice(0, 3).map(crypto => ({
-    name: crypto.name,
-    symbol: crypto.symbol,
-    price: crypto.currentPriceUsd,
-    change: crypto.changePct24h ? (crypto.currentPriceUsd * crypto.changePct24h / 100) : 0,
-    changePercent: crypto.changePct24h || 0,
-    unit: ' USD'
-  })) || [];
+  const cryptoCommodities = useMemo((): CommodityPrice[] => 
+    cryptoData?.slice(0, 3).map(crypto => ({
+      name: crypto.name,
+      symbol: crypto.symbol,
+      price: crypto.currentPriceUsd,
+      change: crypto.changePct24h ? (crypto.currentPriceUsd * crypto.changePct24h / 100) : 0,
+      changePercent: crypto.changePct24h || 0,
+      unit: ' USD'
+    })) || [],
+    [cryptoData]
+  );
 
-  const allCommodities = [...commodities, ...cryptoCommodities];
+  const allCommodities = useMemo(() => 
+    [...commodities, ...cryptoCommodities],
+    [commodities, cryptoCommodities]
+  );
 
   const renderCurrencyCard = (currency: DetailedForexRate, isMainPair: boolean = true) => {
     const isPositive = currency.change > 0;
@@ -212,17 +216,12 @@ const EnhancedCurrencyDashboard = () => {
             </Button>
           </div>
           <div className="text-right">
-            <div className="text-cyan-400 text-lg">
-              {currentTime.toLocaleTimeString('en-US', { hour12: false })}
-            </div>
-            <div className="text-green-400 text-sm">
-              {currentTime.toLocaleDateString('en-US', { 
-                weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' 
-              })}
-            </div>
-            <div className="text-xs text-gray-400">
-              LAST UPDATE: {lastUpdate.toLocaleTimeString()}
-            </div>
+            <TerminalClock
+              className="text-cyan-400 text-lg block"
+              showDate
+              dateClassName="text-green-400 text-sm block"
+              dateOptions={{ weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' }}
+            />
           </div>
         </div>
         

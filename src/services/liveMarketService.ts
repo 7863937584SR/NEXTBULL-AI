@@ -24,29 +24,14 @@ export interface LiveRates {
   vix: IndexData;
 }
 
+import { fetchYahooQuotes } from '@/services/yahooClient';
+
 export interface StockTickerItem {
   symbol: string;
   price: number;
   change: number;
   changePercent: number;
 }
-
-// Helper: fetch a Yahoo Finance chart for a given symbol
-const fetchYahooQuote = async (symbol: string): Promise<{ price: number; prevClose: number } | null> => {
-  try {
-    const res = await fetch(`/api/yahoo/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const meta = data?.chart?.result?.[0]?.meta;
-    if (!meta) return null;
-    return {
-      price: meta.regularMarketPrice ?? meta.previousClose ?? 0,
-      prevClose: meta.previousClose ?? meta.regularMarketPrice ?? 0,
-    };
-  } catch {
-    return null;
-  }
-};
 
 export const fetchLiveMarketStatus = async (): Promise<LiveMarketStatus> => {
   try {
@@ -76,15 +61,12 @@ export const fetchLiveMarketStatus = async (): Promise<LiveMarketStatus> => {
 // ── Fetch all live rates (indices, forex, crypto) ────────────────────
 export const fetchLiveRates = async (): Promise<LiveRates> => {
   try {
-    // ── 1. Indian market indices from Yahoo Finance (parallel) ──
-    const [niftyQ, sensexQ, bankNiftyQ, vixQ] = await Promise.all([
-      fetchYahooQuote('^NSEI'),
-      fetchYahooQuote('^BSESN'),
-      fetchYahooQuote('^NSEBANK'),
-      fetchYahooQuote('^INDIAVIX'),
-    ]);
+    // ── 1. Indian market indices via Edge Function (single batch request) ──
+    const indexSymbols = ['^NSEI', '^BSESN', '^NSEBANK', '^INDIAVIX'];
+    const indexQuotes = await fetchYahooQuotes(indexSymbols);
 
-    const toIndex = (q: { price: number; prevClose: number } | null, fallbackVal: number): IndexData => {
+    const toIndex = (sym: string, fallbackVal: number): IndexData => {
+      const q = indexQuotes[sym];
       if (!q) return { value: fallbackVal, change: 0, changePercent: 0 };
       const change = q.price - q.prevClose;
       const pct = q.prevClose ? (change / q.prevClose) * 100 : 0;
@@ -129,10 +111,10 @@ export const fetchLiveRates = async (): Promise<LiveRates> => {
       btcUsd: { rate: btcPrice, change: (btcPrice * btcChg) / 100, changePercent: btcChg },
       ethUsd: { rate: ethPrice, change: (ethPrice * ethChg) / 100, changePercent: ethChg },
       solUsd: { rate: solPrice, change: (solPrice * solChg) / 100, changePercent: solChg },
-      nifty: toIndex(niftyQ, 21850),
-      sensex: toIndex(sensexQ, 73745),
-      bankNifty: toIndex(bankNiftyQ, 47890),
-      vix: toIndex(vixQ, 14.25),
+      nifty: toIndex('^NSEI', 21850),
+      sensex: toIndex('^BSESN', 73745),
+      bankNifty: toIndex('^NSEBANK', 47890),
+      vix: toIndex('^INDIAVIX', 14.25),
     };
   } catch (error) {
     console.error('Failed to fetch live rates:', error);
@@ -157,21 +139,14 @@ const TICKER_STOCKS = [
 ];
 
 export const fetchTickerStocks = async (): Promise<StockTickerItem[]> => {
+  const symbols = TICKER_STOCKS.map(s => s.symbol);
+  const quotes = await fetchYahooQuotes(symbols);
   const results: StockTickerItem[] = [];
 
-  // Fetch all in parallel for speed
-  const quotes = await Promise.all(
-    TICKER_STOCKS.map(async (s) => {
-      const q = await fetchYahooQuote(s.symbol);
-      return { ...s, q };
-    })
-  );
-
-  for (const { name, q } of quotes) {
+  for (const s of TICKER_STOCKS) {
+    const q = quotes[s.symbol];
     if (q) {
-      const change = q.price - q.prevClose;
-      const pct = q.prevClose ? (change / q.prevClose) * 100 : 0;
-      results.push({ symbol: name, price: q.price, change, changePercent: pct });
+      results.push({ symbol: s.name, price: q.price, change: q.change, changePercent: q.changePercent });
     }
   }
 

@@ -10,6 +10,7 @@ import { NextBullLogo } from '@/components/NextBullLogo';
 import { getAllMarketStatuses, type MarketStatusInfo } from '@/services/marketStatusService';
 import { useQuery } from '@tanstack/react-query';
 import { fetchLiveRates } from '@/services/liveMarketService';
+import { TerminalClock } from '@/components/ui/TerminalClock';
 
 const TVUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
@@ -43,13 +44,12 @@ const STATUS_STYLES: Record<string, { border: string; text: string; dot: string 
 };
 
 export default function Markets() {
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [marketStatuses, setMarketStatuses] = useState<MarketStatusInfo[]>(() => getAllMarketStatuses());
   const [latency, setLatency] = useState<number | null>(null);
 
-  // Live data feed — measure actual API latency
+  // Shared query key with AppLayout to avoid duplicate API calls
   const { data: liveRates, dataUpdatedAt, isFetching } = useQuery({
-    queryKey: ['markets-live-rates'],
+    queryKey: ['live-rates'],
     queryFn: async () => {
       const start = performance.now();
       const result = await fetchLiveRates();
@@ -60,13 +60,11 @@ export default function Markets() {
     retry: 2,
   });
 
-  // Update clock + market status every second
+  // Update market status every 30 seconds (not every second — it only changes at market open/close)
   useEffect(() => {
     const timer = setInterval(() => {
-      const now = new Date();
-      setCurrentTime(now);
-      setMarketStatuses(getAllMarketStatuses(now));
-    }, 1000);
+      setMarketStatuses(getAllMarketStatuses(new Date()));
+    }, 30000);
     return () => clearInterval(timer);
   }, []);
 
@@ -141,14 +139,12 @@ export default function Markets() {
             </div>
             
             <div className="text-right font-mono">
-              <div className="text-cyan-400 text-base font-bold tracking-wider drop-shadow-[0_0_6px_rgba(34,211,238,0.3)]">
-                {currentTime.toLocaleTimeString('en-US', { hour12: false })}
-              </div>
-              <div className="text-emerald-400/60 text-xs">
-                {currentTime.toLocaleDateString('en-US', { 
-                  weekday: 'short', month: 'short', day: '2-digit' 
-                })}
-              </div>
+              <TerminalClock
+                className="text-cyan-400 text-base font-bold tracking-wider drop-shadow-[0_0_6px_rgba(34,211,238,0.3)] block"
+                showDate
+                dateClassName="text-emerald-400/60 text-xs block"
+                dateOptions={{ weekday: 'short', month: 'short', day: '2-digit' }}
+              />
             </div>
           </div>
 

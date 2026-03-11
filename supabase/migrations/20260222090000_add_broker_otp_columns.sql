@@ -3,4 +3,4 @@
 ALTER TABLE public.broker_connections
   ADD COLUMN IF NOT EXISTS phone_number TEXT,
   ADD COLUMN IF NOT EXISTS connection_method TEXT NOT NULL DEFAULT 'api'
-    CHECK (connection_method IN ('api', 'otp'));
+    CHECK (connection_method IN ('api', 'otp', 'oauth', 'direct_token'));

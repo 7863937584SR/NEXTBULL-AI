@@ -15,14 +15,14 @@ export const TopMovers = () => {
     const gainersQuery = useQuery({
         queryKey: ['nse-gainers'],
         queryFn: fetchTopGainers,
-        refetchInterval: isAutoRefresh ? 5000 : false,
+        refetchInterval: isAutoRefresh ? 30000 : false,
         retry: 1,
     });
 
     const losersQuery = useQuery({
         queryKey: ['nse-losers'],
         queryFn: fetchTopLosers,
-        refetchInterval: isAutoRefresh ? 5000 : false,
+        refetchInterval: isAutoRefresh ? 30000 : false,
         retry: 1,
     });
 
@@ -55,7 +55,7 @@ export const TopMovers = () => {
                     </CardTitle>
                     <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
                         <span className={`inline-block w-1.5 h-1.5 rounded-full ${isAutoRefresh ? 'bg-success animate-pulse' : 'bg-muted'}`} />
-                        Live Data {isAutoRefresh ? '(5s update)' : '(paused)'}
+                        Live Data {isAutoRefresh ? '(30s update)' : '(paused)'}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">

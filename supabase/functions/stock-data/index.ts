@@ -117,8 +117,8 @@ serve(async (req) => {
     const msg = error instanceof Error ? error.message : "Unknown error";
     console.error("Stock data fetch error:", msg);
     return new Response(
-      JSON.stringify({ error: msg }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: msg, stocks: [], indices: [] }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

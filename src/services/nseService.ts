@@ -1,12 +1,14 @@
 import axios from 'axios';
+import { fetchYahooQuotes } from '@/services/yahooClient';
 
 // Since we're using a proxy in Vite, we just point to the relative `/api/nse` path
 // which will be rewritten to `https://www.nseindia.com/api`.
 const BASE_URL = '/api/nse';
 
-// Axios instance with default headers
+// Axios instance with default headers and timeout
 const nseClient = axios.create({
     baseURL: BASE_URL,
+    timeout: 10000,
     headers: {
         'Accept': '*/*',
         'Accept-Language': 'en-US,en;q=0.9',
@@ -71,35 +73,24 @@ export const fetchMarketIndices = async (): Promise<NseIndexData[]> => {
         ];
         
         const indices: NseIndexData[] = [];
+        const symbolList = nseSymbols.map(s => s.symbol);
+        const quotes = await fetchYahooQuotes(symbolList);
+
         for (const { symbol, index } of nseSymbols) {
-            try {
-                const response = await fetch(`/api/yahoo/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m`);
-                if (response.ok) {
-                    const data = await response.json();
-                    const result = data?.chart?.result?.[0];
-                    if (result) {
-                        const meta = result.meta;
-                        const current = meta.regularMarketPrice || meta.previousClose;
-                        const prevClose = meta.previousClose;
-                        const variation = current - prevClose;
-                        const percentChange = (variation / prevClose) * 100;
-                        
-                        indices.push({
-                            index,
-                            last: current,
-                            variation,
-                            percentChange,
-                            open: meta.regularMarketOpen || current,
-                            high: meta.regularMarketDayHigh || current,
-                            low: meta.regularMarketDayLow || current,
-                            previousClose: prevClose,
-                            yearHigh: meta.fiftyTwoWeekHigh || current * 1.2,
-                            yearLow: meta.fiftyTwoWeekLow || current * 0.8,
-                        });
-                    }
-                }
-            } catch (error) {
-                console.warn(`Failed to fetch ${symbol} from Yahoo Finance:`, error);
+            const q = quotes[symbol];
+            if (q) {
+                indices.push({
+                    index,
+                    last: q.price,
+                    variation: q.change,
+                    percentChange: q.changePercent,
+                    open: q.open,
+                    high: q.high,
+                    low: q.low,
+                    previousClose: q.prevClose,
+                    yearHigh: q.fiftyTwoWeekHigh ?? q.price * 1.2,
+                    yearLow: q.fiftyTwoWeekLow ?? q.price * 0.8,
+                });
             }
         }
         

@@ -24,21 +24,20 @@ CREATE TABLE IF NOT EXISTS public.trade_journal (
 -- RLS
 ALTER TABLE public.trade_journal ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own journal entries"
-  ON public.trade_journal FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own journal entries"
-  ON public.trade_journal FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own journal entries"
-  ON public.trade_journal FOR UPDATE
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own journal entries"
-  ON public.trade_journal FOR DELETE
-  USING (auth.uid() = user_id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'trade_journal' AND policyname = 'Users can view own journal entries') THEN
+    CREATE POLICY "Users can view own journal entries" ON public.trade_journal FOR SELECT USING (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'trade_journal' AND policyname = 'Users can insert own journal entries') THEN
+    CREATE POLICY "Users can insert own journal entries" ON public.trade_journal FOR INSERT WITH CHECK (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'trade_journal' AND policyname = 'Users can update own journal entries') THEN
+    CREATE POLICY "Users can update own journal entries" ON public.trade_journal FOR UPDATE USING (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'trade_journal' AND policyname = 'Users can delete own journal entries') THEN
+    CREATE POLICY "Users can delete own journal entries" ON public.trade_journal FOR DELETE USING (auth.uid() = user_id);
+  END IF;
+END $$;
 
 -- Index for fast user queries
-CREATE INDEX idx_trade_journal_user ON public.trade_journal(user_id, trade_date DESC);
+CREATE INDEX IF NOT EXISTS idx_trade_journal_user ON public.trade_journal(user_id, trade_date DESC);

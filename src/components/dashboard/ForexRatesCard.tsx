@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -43,7 +43,7 @@ export const ForexRatesCard = () => {
     setRows(next);
   }, [q.data]);
 
-  const showRows = useMemo(() => rows, [rows]);
+  // Removed pointless useMemo(() => rows, [rows]) — just use rows directly
 
   return (
     <Card className="h-full bg-card/60 backdrop-blur-md border-border/40 overflow-hidden shadow-xl shadow-black/20 flex flex-col">
@@ -55,7 +55,7 @@ export const ForexRatesCard = () => {
           </CardTitle>
           <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
             <span className={`inline-block w-1.5 h-1.5 rounded-full ${q.isFetching ? 'bg-success animate-pulse' : 'bg-muted'}`} />
-            Live Data (10s)
+            Live Data (60s)
           </p>
         </div>
         <Link to="/currency">
@@ -80,7 +80,7 @@ export const ForexRatesCard = () => {
                 </p>
               </div>
             </div>
-          ) : q.isLoading && showRows.length === 0 ? (
+          ) : q.isLoading && rows.length === 0 ? (
             <div className="space-y-2 p-2">
               {[...Array(7)].map((_, i) => (
                 <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-border/30 bg-secondary/10">
@@ -97,7 +97,7 @@ export const ForexRatesCard = () => {
             </div>
           ) : (
             <div className="space-y-1.5 p-1">
-              {showRows.map((r) => {
+              {rows.map((r) => {
                 const isUp = (r.deltaPct ?? 0) >= 0;
                 const quote = r.pair.split('/')[1] || '';
 

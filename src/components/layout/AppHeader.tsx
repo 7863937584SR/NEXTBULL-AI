@@ -9,8 +9,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useCallback } from "react";
 import { NextBullLogo } from "@/components/NextBullLogo";
+import { TerminalClock } from "@/components/ui/TerminalClock";
 
 interface AppHeaderProps {
   onToggleSidebar: () => void;
@@ -19,23 +20,15 @@ interface AppHeaderProps {
 const AppHeader = ({ onToggleSidebar }: AppHeaderProps) => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [currentTime, setCurrentTime] = useState(new Date());
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     try {
       await signOut();
       navigate("/auth");
     } catch (error) {
       console.error("Error signing out:", error);
     }
-  };
+  }, [signOut, navigate]);
 
   return (
     <div className="h-11 bg-[#0a0a0a] border-b border-emerald-500/15 flex items-center justify-between px-4 font-mono text-xs">
@@ -91,14 +84,11 @@ const AppHeader = ({ onToggleSidebar }: AppHeaderProps) => {
       {/* Right section - Time and user controls */}
       <div className="flex items-center space-x-3">
         <div className="hidden md:block text-white text-right">
-          <div className="text-cyan-400 text-[11px] font-bold tracking-wider drop-shadow-[0_0_6px_rgba(34,211,238,0.3)]">
-            {currentTime.toLocaleTimeString('en-US', { hour12: false })}
-          </div>
-          <div className="text-emerald-400/60 text-[10px]">
-            {currentTime.toLocaleDateString('en-US', { 
-              month: 'short', day: '2-digit' 
-            }).toUpperCase()}
-          </div>
+          <TerminalClock
+            className="text-cyan-400 text-[11px] font-bold tracking-wider drop-shadow-[0_0_6px_rgba(34,211,238,0.3)]"
+            showDate
+            dateClassName="text-emerald-400/60 text-[10px] block"
+          />
         </div>
         
         <div className="flex items-center space-x-1.5">

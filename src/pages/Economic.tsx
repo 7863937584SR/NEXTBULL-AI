@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Calendar,
   Clock,
@@ -105,105 +106,177 @@ async function fetchLiveEconomicEvents(): Promise<DayEvents[]> {
     days.push({ date: d(i), events: [] });
   }
 
-  try {
-    // Fetch real economic news from Google News RSS (India + Global economy)
-    const feeds = [
-      'https://news.google.com/rss/search?q=india+economic+data+RBI+GDP+CPI+inflation&hl=en-IN&gl=IN&ceid=IN:en',
-      'https://news.google.com/rss/search?q=US+economic+data+Fed+NFP+CPI+GDP&hl=en-US&gl=US&ceid=US:en',
-    ];
+  const hasSupabaseConfig = Boolean(
+    import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+  );
 
-    const allItems: EconomicEvent[] = [];
+  const classifyEvent = (title: string, description?: string, defaultCountry: EconomicEvent['country'] = 'GL') => {
+    const titleLow = title.toLowerCase();
 
-    for (const feedUrl of feeds) {
-      try {
-        const res = await fetch(feedUrl);
-        if (!res.ok) continue;
-        const text = await res.text();
-        const parser = new DOMParser();
-        const xml = parser.parseFromString(text, 'text/xml');
-        const items = xml.querySelectorAll('item');
+    // Country detection
+    let country = defaultCountry;
+    if (titleLow.match(/\bindia\b|rbi|nifty|sensex|rupee|sebi|indian/)) country = 'IN';
+    else if (titleLow.match(/\bus\b|\bu\.s\b|fed |fomc|dollar|nfp|payroll|treasury|wall street|nasdaq|s&p/)) country = 'US';
+    else if (titleLow.match(/ecb|euro(?:zone)?|eu /)) country = 'EU';
+    else if (titleLow.match(/japan|boj|yen|nikkei/)) country = 'JP';
+    else if (titleLow.match(/china|pboc|yuan|shanghai/)) country = 'CN';
+    else if (titleLow.match(/\buk\b|boe|sterling|pound|ftse/)) country = 'UK';
 
-        items.forEach((item) => {
-          const title = item.querySelector('title')?.textContent || '';
-          const pubDate = item.querySelector('pubDate')?.textContent || '';
-          const desc = item.querySelector('description')?.textContent || '';
-
-          if (!title || !pubDate) return;
-
-          const eventDate = new Date(pubDate);
-          const eventTime = eventDate.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-            timeZone: 'Asia/Kolkata',
-          });
-
-          // Determine country from content
-          const titleLow = title.toLowerCase();
-          let country: EconomicEvent['country'] = 'GL';
-          if (titleLow.includes('india') || titleLow.includes('rbi') || titleLow.includes('nifty') || titleLow.includes('sensex') || titleLow.includes('rupee'))
-            country = 'IN';
-          else if (titleLow.includes('us ') || titleLow.includes('fed ') || titleLow.includes('dollar') || titleLow.includes('nfp') || titleLow.includes('fomc') || titleLow.includes('treasury'))
-            country = 'US';
-          else if (titleLow.includes('ecb') || titleLow.includes('euro'))
-            country = 'EU';
-          else if (titleLow.includes('japan') || titleLow.includes('boj') || titleLow.includes('yen'))
-            country = 'JP';
-          else if (titleLow.includes('china') || titleLow.includes('pboc') || titleLow.includes('yuan'))
-            country = 'CN';
-          else if (titleLow.includes('uk ') || titleLow.includes('boe ') || titleLow.includes('sterling') || titleLow.includes('pound'))
-            country = 'UK';
-
-          // Determine impact
-          let impact: EconomicEvent['impact'] = 'low';
-          if (titleLow.match(/gdp|inflation|cpi|rate decision|nfp|payroll|employment|rbi|fed |fomc|interest rate/))
-            impact = 'high';
-          else if (titleLow.match(/pmi|trade|deficit|surplus|manufacturing|services|consumer|sentiment/))
-            impact = 'medium';
-
-          // Determine category
-          let category = 'Economy';
-          if (titleLow.match(/gdp|growth/)) category = 'GDP';
-          else if (titleLow.match(/inflation|cpi|wpi|pce/)) category = 'Inflation';
-          else if (titleLow.match(/rate|monetary|rbi|fed|boj|ecb|boe/)) category = 'Monetary';
-          else if (titleLow.match(/employment|job|payroll|nfp|unemployment/)) category = 'Employment';
-          else if (titleLow.match(/trade|export|import|deficit/)) category = 'Trade';
-          else if (titleLow.match(/pmi|manufacturing|industrial|services/)) category = 'Manufacturing';
-          else if (titleLow.match(/fiscal|tax|budget|revenue/)) category = 'Fiscal';
-          else if (titleLow.match(/sentiment|consumer|confidence/)) category = 'Sentiment';
-
-          // Clean description
-          const cleanDesc = desc ? desc.replace(/<[^>]*>/g, '').slice(0, 200) : undefined;
-
-          allItems.push({
-            time: eventTime,
-            country,
-            impact,
-            category,
-            event: title.slice(0, 120),
-            description: cleanDesc,
-          });
-        });
-      } catch {
-        // Skip failed feed
-      }
+    // Impact classification
+    let impact: EconomicEvent['impact'] = 'low';
+    if (titleLow.match(/gdp|inflation|cpi|rate decision|nfp|payroll|employment|rbi|fed |fomc|interest rate|recession|crash/)) {
+      impact = 'high';
+    } else if (titleLow.match(/pmi|trade|deficit|surplus|manufacturing|services|consumer|sentiment|housing|retail/)) {
+      impact = 'medium';
     }
 
-    // Assign events to the correct day
-    // Since RSS doesn't give exact future dates reliably, distribute found events to today
-    // and show them as live news-driven economic events
-    if (allItems.length > 0) {
-      // Today gets all parsed events (most relevant)
-      days[1].events = allItems.slice(0, 15);
-      // Spread some to adjacent days for variety
-      if (allItems.length > 15) days[2].events = allItems.slice(15, 25);
-      if (allItems.length > 25) days[0].events = allItems.slice(25, 35);
+    // Category
+    let category = 'Economy';
+    if (titleLow.match(/gdp|growth/)) category = 'GDP';
+    else if (titleLow.match(/inflation|cpi|wpi|pce/)) category = 'Inflation';
+    else if (titleLow.match(/rate|monetary|rbi|fed|boj|ecb|boe/)) category = 'Monetary';
+    else if (titleLow.match(/employ|job|payroll|nfp|unemployment/)) category = 'Employment';
+    else if (titleLow.match(/trade|export|import|deficit/)) category = 'Trade';
+    else if (titleLow.match(/pmi|manufactur|industrial|services/)) category = 'Manufacturing';
+    else if (titleLow.match(/fiscal|tax|budget|revenue/)) category = 'Fiscal';
+    else if (titleLow.match(/sentiment|consumer|confidence/)) category = 'Sentiment';
+    else if (titleLow.match(/housing|real estate|mortgage/)) category = 'Housing';
+    else if (titleLow.match(/oil|crude|energy|opec/)) category = 'Energy';
+
+    return { country, impact, category, description };
+  };
+
+  const fetchViaRss2Json = async (url: string, defaultCountry: EconomicEvent['country']) => {
+    const res = await fetch(
+      `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`
+    );
+    if (!res.ok) throw new Error(`rss2json ${res.status}`);
+    const data = await res.json();
+    const items = Array.isArray(data.items) ? data.items : [];
+    return items.map((item: any) => {
+      const title = String(item.title || '').slice(0, 120);
+      const description = String(item.description || '').replace(/<[^>]*>/g, '').slice(0, 200);
+      return {
+        title,
+        pubDate: item.pubDate || item.published || new Date().toISOString(),
+        description,
+        defaultCountry,
+      };
+    });
+  };
+
+  try {
+    let events: EconomicEvent[] = [];
+
+    if (hasSupabaseConfig) {
+      // Fetch from our Supabase edge function (server-side RSS proxy)
+      const { data, error } = await supabase.functions.invoke('economic-calendar');
+      if (error) {
+        console.warn('Economic calendar fetch failed:', error.message);
+      } else if (data?.events?.length) {
+        events = data.events.map((ev: any) => {
+          let eventTime = '09:00';
+          try {
+            const eventDate = new Date(ev.pubDate);
+            if (!isNaN(eventDate.getTime())) {
+              eventTime = eventDate.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+                timeZone: 'Asia/Kolkata',
+              });
+            }
+          } catch {
+            /* keep default */
+          }
+
+          return {
+            time: eventTime,
+            country: ev.country as EconomicEvent['country'],
+            impact: ev.impact as EconomicEvent['impact'],
+            category: ev.category || 'Economy',
+            event: ev.title?.slice(0, 120) || '',
+            description: ev.description?.slice(0, 200),
+          };
+        });
+      }
+    } else {
+      console.warn('Supabase config missing. Falling back to client RSS.');
+    }
+
+    if (events.length === 0) {
+      // Fallback: client-side RSS via rss2json (CORS-safe)
+      const feeds = [
+        {
+          url: 'https://news.google.com/rss/search?q=india+economic+data+RBI+GDP+CPI+inflation+rate+decision&hl=en-IN&gl=IN&ceid=IN:en',
+          defaultCountry: 'IN' as const,
+        },
+        {
+          url: 'https://news.google.com/rss/search?q=US+economic+data+Fed+NFP+CPI+GDP+FOMC+treasury&hl=en-US&gl=US&ceid=US:en',
+          defaultCountry: 'US' as const,
+        },
+        {
+          url: 'https://news.google.com/rss/search?q=global+economy+ECB+BOJ+central+bank+rate+decision&hl=en&gl=US&ceid=US:en',
+          defaultCountry: 'GL' as const,
+        },
+      ];
+
+      const results = await Promise.allSettled(
+        feeds.map((feed) => fetchViaRss2Json(feed.url, feed.defaultCountry))
+      );
+
+      const allItems: Array<{ title: string; pubDate: string; description: string; defaultCountry: EconomicEvent['country'] }> = [];
+      for (const r of results) {
+        if (r.status === 'fulfilled') allItems.push(...r.value);
+      }
+
+      const seen = new Set<string>();
+      const unique = allItems.filter((item) => {
+        const key = item.title.toLowerCase().slice(0, 60);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      events = unique.slice(0, 60).map((item) => {
+        let eventTime = '09:00';
+        try {
+          const eventDate = new Date(item.pubDate);
+          if (!isNaN(eventDate.getTime())) {
+            eventTime = eventDate.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'Asia/Kolkata',
+            });
+          }
+        } catch {
+          /* keep default */
+        }
+
+        const meta = classifyEvent(item.title, item.description, item.defaultCountry);
+        return {
+          time: eventTime,
+          country: meta.country,
+          impact: meta.impact,
+          category: meta.category,
+          event: item.title.slice(0, 120),
+          description: meta.description,
+        };
+      });
+    }
+
+    if (events.length > 0) {
+      days[1].events = events.slice(0, 15);
+      if (events.length > 15) days[2].events = events.slice(15, 25);
+      if (events.length > 25) days[0].events = events.slice(25, 35);
+      if (events.length > 35) days[3].events = events.slice(35, 45);
+      if (events.length > 45) days[4].events = events.slice(45, 55);
     }
   } catch (error) {
     console.error('Failed to fetch economic events:', error);
   }
 
-  // If no events fetched (API failure), show empty state rather than fake data
   return days;
 }
 

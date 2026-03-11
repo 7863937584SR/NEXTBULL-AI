@@ -4,22 +4,227 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type",
 };
 
-function jsonResponse(body: Record<string, unknown>, status = 200) {
+/* ═══════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════ */
+
+async function sha256Hex(message: string): Promise<string> {
+  const data = new TextEncoder().encode(message);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function json(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
-// ── OTP STORE (in-memory, per-instance — production should use Redis/DB) ──
-const otpStore = new Map<string, { otp: string; expiresAt: number; broker: string }>();
+/* ═══════════════════════════════════════════════════════════
+   BROKER OAuth CONFIGURATIONS
+   
+   Each broker reads API key + secret from Supabase secrets
+   (env vars). The server admin must set these:
+   
+   npx supabase secrets set \
+     ZERODHA_API_KEY=xxx ZERODHA_API_SECRET=xxx \
+     UPSTOX_API_KEY=xxx UPSTOX_API_SECRET=xxx \
+     ANGELONE_API_KEY=xxx ANGELONE_API_SECRET=xxx \
+     DHAN_CLIENT_ID=xxx DHAN_SECRET=xxx \
+     FYERS_APP_ID=xxx FYERS_SECRET=xxx \
+     FIVEPAISA_APP_KEY=xxx FIVEPAISA_SECRET=xxx \
+     --project-ref YOUR_PROJECT_REF
+   ═══════════════════════════════════════════════════════════ */
 
-function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+interface TokenResult {
+  access_token: string;
+  user_id?: string | null;
+  user_name?: string | null;
+  email?: string | null;
+  expires_in?: number;
 }
+
+interface BrokerConfig {
+  name: string;
+  envKey: string;
+  envSecret: string;
+  buildLoginUrl: (apiKey: string, redirectUri: string) => string;
+  exchangeCode: (p: {
+    code: string;
+    apiKey: string;
+    apiSecret: string;
+    redirectUri: string;
+  }) => Promise<TokenResult>;
+}
+
+const BROKER_OAUTH: Record<string, BrokerConfig> = {
+  /* ─── Zerodha (Kite Connect v3) ─── */
+  zerodha: {
+    name: "Zerodha",
+    envKey: "ZERODHA_API_KEY",
+    envSecret: "ZERODHA_API_SECRET",
+    buildLoginUrl: (apiKey) =>
+      `https://kite.zerodha.com/connect/login?v=3&api_key=${encodeURIComponent(apiKey)}`,
+    exchangeCode: async ({ code, apiKey, apiSecret }) => {
+      // Zerodha checksum = SHA-256(api_key + request_token + api_secret)
+      const checksum = await sha256Hex(apiKey + code + apiSecret);
+      const res = await fetch("https://api.kite.trade/session/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-Kite-Version": "3",
+        },
+        body: new URLSearchParams({
+          api_key: apiKey,
+          request_token: code,
+          checksum,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || `Zerodha error ${res.status}`);
+      const d = data.data || data;
+      return {
+        access_token: d.access_token,
+        user_id: d.user_id,
+        user_name: d.user_name || d.user_id,
+        email: d.email || null,
+      };
+    },
+  },
+
+  /* ─── Upstox (v2 OAuth) ─── */
+  upstox: {
+    name: "Upstox",
+    envKey: "UPSTOX_API_KEY",
+    envSecret: "UPSTOX_API_SECRET",
+    buildLoginUrl: (apiKey, redirectUri) =>
+      `https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=${encodeURIComponent(apiKey)}&redirect_uri=${encodeURIComponent(redirectUri)}`,
+    exchangeCode: async ({ code, apiKey, apiSecret, redirectUri }) => {
+      const res = await fetch(
+        "https://api.upstox.com/v2/login/authorization/token",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json",
+          },
+          body: new URLSearchParams({
+            code,
+            client_id: apiKey,
+            client_secret: apiSecret,
+            redirect_uri: redirectUri,
+            grant_type: "authorization_code",
+          }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || `Upstox error ${res.status}`);
+      return {
+        access_token: data.access_token,
+        user_id: data.user_id || null,
+        user_name: data.user_name || data.user_id || null,
+        email: data.email || null,
+      };
+    },
+  },
+
+  /* ─── Angel One (SmartAPI Publisher Login) ─── */
+  angelone: {
+    name: "Angel One",
+    envKey: "ANGELONE_API_KEY",
+    envSecret: "ANGELONE_API_SECRET",
+    buildLoginUrl: (apiKey) =>
+      `https://smartapi.angelone.in/publisher-login?api_key=${encodeURIComponent(apiKey)}`,
+    exchangeCode: async ({ code }) => {
+      // Angel One publisher login returns JWT token directly in the redirect
+      return { access_token: code, user_name: null, email: null };
+    },
+  },
+
+  /* ─── Dhan (DhanHQ — Direct Access Token from portal) ─── */
+  dhan: {
+    name: "Dhan",
+    envKey: "DHAN_CLIENT_ID",
+    envSecret: "DHAN_ACCESS_TOKEN",
+    buildLoginUrl: () => "__DIRECT_TOKEN__", // Dhan uses pre-issued token, no OAuth redirect
+    exchangeCode: async ({ apiKey }) => {
+      // Dhan's SELF token is pre-issued from their portal — no exchange needed.
+      // The access token is stored in DHAN_ACCESS_TOKEN env var.
+      const directToken = Deno.env.get("DHAN_ACCESS_TOKEN");
+      if (!directToken) throw new Error("DHAN_ACCESS_TOKEN not configured");
+      return {
+        access_token: directToken,
+        user_id: apiKey, // dhanClientId
+        user_name: `Dhan-${apiKey}`,
+        email: null,
+      };
+    },
+  },
+
+  /* ─── Fyers (v3 OAuth) ─── */
+  fyers: {
+    name: "Fyers",
+    envKey: "FYERS_APP_ID",
+    envSecret: "FYERS_SECRET",
+    buildLoginUrl: (appId, redirectUri) =>
+      `https://api-t1.fyers.in/api/v3/generate-authcode?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=nextbull`,
+    exchangeCode: async ({ code, apiKey, apiSecret }) => {
+      // Fyers: appIdHash = SHA-256(appId:secret)
+      const appIdHash = await sha256Hex(`${apiKey}:${apiSecret}`);
+      const res = await fetch(
+        "https://api-t1.fyers.in/api/v3/validate-authcode",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            grant_type: "authorization_code",
+            appIdHash,
+            code,
+          }),
+        }
+      );
+      const data = await res.json();
+      if (data.s !== "ok" && data.code !== 200) {
+        throw new Error(data?.message || "Fyers error");
+      }
+      return {
+        access_token: data.access_token,
+        user_name: data.data?.name || null,
+        email: data.data?.email || null,
+      };
+    },
+  },
+
+  /* ─── 5Paisa (Vendor Login) ─── */
+  fivepaisa: {
+    name: "5Paisa",
+    envKey: "FIVEPAISA_APP_KEY",
+    envSecret: "FIVEPAISA_SECRET",
+    buildLoginUrl: (appKey, redirectUri) =>
+      `https://dev-openapi.5paisa.com/WebVendorLogin/VLogin/Index?VendorKey=${encodeURIComponent(appKey)}&ResponseURL=${encodeURIComponent(redirectUri)}`,
+    exchangeCode: async ({ code }) => {
+      // 5Paisa returns RequestToken in the callback
+      return { access_token: code };
+    },
+  },
+};
+
+/* ═══════════════════════════════════════════════════════════
+   EDGE FUNCTION
+   
+   Actions:
+     initiate  → Get broker login URL (server reads API key from env)
+     callback  → Exchange auth code for token, store in DB
+     disconnect→ Deactivate a connection
+     status    → List connections + which brokers are configured
+     exchange_token → Legacy (frontend sends keys — backward compat)
+   ═══════════════════════════════════════════════════════════ */
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -28,256 +233,284 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify user auth
+    // ─── Auth ───
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
-
+    if (!authHeader) return json({ error: "Unauthorized" });
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return jsonResponse({ error: "Invalid token" }, 401);
-    }
+    const {
+      data: { user },
+      error: authErr,
+    } = await supabase.auth.getUser(token);
+    if (authErr || !user) return json({ error: "Invalid token" });
 
     const body = await req.json();
     const { action } = body;
 
-    // ═══════════════════════════════════════════
-    // ACTION: get_login_url (OAuth for Upstox / Zerodha)
-    // ═══════════════════════════════════════════
-    if (action === "get_login_url") {
-      const { api_key, redirect_uri, broker = "upstox" } = body;
-      if (!api_key || !redirect_uri) {
-        return jsonResponse({ error: "Missing api_key or redirect_uri" }, 400);
-      }
+    // ═══════════════════════════════════════
+    // ACTION: initiate
+    // Returns the broker's OAuth login URL
+    // ═══════════════════════════════════════
+    if (action === "initiate") {
+      const { broker, redirect_uri } = body;
+      if (!broker) return json({ error: "Missing broker" });
 
-      let loginUrl = "";
-
-      if (broker === "upstox") {
-        loginUrl = `https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=${encodeURIComponent(api_key)}&redirect_uri=${encodeURIComponent(redirect_uri)}`;
-      } else if (broker === "zerodha") {
-        loginUrl = `https://kite.zerodha.com/connect/login?v=3&api_key=${encodeURIComponent(api_key)}`;
-      } else {
-        return jsonResponse({ error: `OAuth not supported for broker: ${broker}` }, 400);
-      }
-
-      return jsonResponse({ login_url: loginUrl });
-    }
-
-    // ═══════════════════════════════════════════
-    // ACTION: exchange_token (OAuth callback)
-    // ═══════════════════════════════════════════
-    if (action === "exchange_token") {
-      const { code, api_key, api_secret, redirect_uri, broker = "upstox" } = body;
-      if (!code || !api_key || !api_secret || !redirect_uri) {
-        return jsonResponse({ error: "Missing required fields" }, 400);
-      }
-
-      let tokenData: Record<string, unknown> = {};
-
-      if (broker === "upstox") {
-        const tokenRes = await fetch("https://api.upstox.com/v2/login/authorization/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-          body: new URLSearchParams({ code, client_id: api_key, client_secret: api_secret, redirect_uri, grant_type: "authorization_code" }),
-        });
-        tokenData = await tokenRes.json();
-        if (!tokenRes.ok) {
-          console.error("Upstox token exchange error:", tokenData);
-          return jsonResponse({ error: (tokenData as any).message || "Token exchange failed" }, 400);
-        }
-      } else if (broker === "zerodha") {
-        // Zerodha Kite Connect token exchange
-        const checksum = await crypto.subtle.digest(
-          "SHA-256",
-          new TextEncoder().encode(api_key + code + api_secret)
+      const config = BROKER_OAUTH[broker];
+      if (!config) {
+        return json(
+          {
+            error: `Broker "${broker}" does not support OAuth login. Use API key connection instead.`,
+          }
         );
-        const checksumHex = Array.from(new Uint8Array(checksum))
-          .map(b => b.toString(16).padStart(2, "0"))
-          .join("");
+      }
 
-        const tokenRes = await fetch("https://api.kite.trade/session/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Kite-Version": "3" },
-          body: new URLSearchParams({ api_key, request_token: code, checksum: checksumHex }),
+      const apiKey = Deno.env.get(config.envKey);
+      if (!apiKey) {
+        // Return 200 with error field so Supabase client doesn't throw.
+        // The frontend checks data.error to handle this gracefully.
+        return json({
+          error: "not_configured",
+          message: `${config.name} is not configured yet. Server admin needs to set ${config.envKey} and ${config.envSecret} in Supabase secrets.`,
+          broker,
+          broker_name: config.name,
         });
-        tokenData = await tokenRes.json();
-        if (!tokenRes.ok) {
-          console.error("Zerodha token exchange error:", tokenData);
-          return jsonResponse({ error: (tokenData as any).message || "Token exchange failed" }, 400);
+      }
+
+      const loginUrl = config.buildLoginUrl(apiKey, redirect_uri || "");
+
+      // Direct-token brokers (e.g. Dhan) have a pre-issued token — no OAuth redirect needed
+      if (loginUrl === "__DIRECT_TOKEN__") {
+        console.log(`[BROKER] ${config.name} is a direct-token broker, auto-connecting for user ${user.id}`);
+
+        const accessToken = Deno.env.get(config.envSecret);
+        if (!accessToken) {
+          return json({ error: "not_configured", message: `${config.name} access token not set.`, broker, broker_name: config.name });
         }
-        // Normalize Zerodha response
-        const kiteData = (tokenData as any).data || tokenData;
-        tokenData = {
-          access_token: kiteData.access_token,
-          user_id: kiteData.user_id,
-          user_name: kiteData.user_name || kiteData.user_id,
-          email: kiteData.email || null,
-        };
-      } else {
-        return jsonResponse({ error: `OAuth not supported for broker: ${broker}` }, 400);
+
+        const displayName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Trader";
+
+        const { error: dbError } = await supabase
+          .from("broker_connections")
+          .upsert(
+            {
+              user_id: user.id,
+              broker,
+              access_token: accessToken,
+              token_expiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+              broker_user_id: apiKey,
+              email: user.email || null,
+              user_name: displayName,
+              is_active: true,
+              connection_method: "direct_token",
+            },
+            { onConflict: "user_id,broker" }
+          );
+
+        if (dbError) {
+          console.error(`[BROKER] DB error for ${config.name}:`, dbError);
+          return json({ error: "Failed to save connection" });
+        }
+
+        return json({
+          direct_connected: true,
+          success: true,
+          broker,
+          broker_name: config.name,
+          user_name: displayName,
+          user_id: apiKey,
+        });
       }
 
-      // Store connection
-      const { error: dbError } = await supabase.from("broker_connections").upsert({
-        user_id: user.id,
-        broker,
-        access_token: tokenData.access_token as string,
-        token_expiry: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        broker_user_id: (tokenData.user_id as string) || null,
-        email: (tokenData.email as string) || null,
-        user_name: (tokenData.user_name as string) || null,
-        is_active: true,
-        connection_method: "api",
-      }, { onConflict: "user_id,broker" });
-
-      if (dbError) {
-        console.error("DB error storing broker connection:", dbError);
-        return jsonResponse({ error: "Failed to save connection" }, 500);
-      }
-
-      return jsonResponse({
-        success: true,
-        user_name: tokenData.user_name,
-        email: tokenData.email,
-        user_id: tokenData.user_id,
-      });
+      console.log(
+        `[BROKER] ${config.name} login URL generated for user ${user.id}`
+      );
+      return json({ login_url: loginUrl, broker, broker_name: config.name });
     }
 
-    // ═══════════════════════════════════════════
-    // ACTION: send_otp (OTP-based connection)
-    // ═══════════════════════════════════════════
-    if (action === "send_otp") {
-      const { phone_number, broker } = body;
-      if (!phone_number || !broker) {
-        return jsonResponse({ error: "Missing phone_number or broker" }, 400);
+    // ═══════════════════════════════════════
+    // ACTION: callback
+    // Exchange auth code for token → store in DB
+    // ═══════════════════════════════════════
+    if (action === "callback") {
+      const { broker, code, redirect_uri } = body;
+      if (!broker || !code)
+        return json({ error: "Missing broker or code" });
+
+      const config = BROKER_OAUTH[broker];
+      if (!config) return json({ error: `Unknown broker: ${broker}` });
+
+      const apiKey = Deno.env.get(config.envKey);
+      const apiSecret = Deno.env.get(config.envSecret);
+      if (!apiKey || !apiSecret) {
+        return json(
+          { error: `${config.name} server credentials not configured` }
+        );
       }
 
-      // Validate phone format (Indian: 10 digits)
-      const cleanPhone = phone_number.replace(/\D/g, "");
-      if (cleanPhone.length !== 10) {
-        return jsonResponse({ error: "Invalid phone number. Must be 10 digits." }, 400);
-      }
+      console.log(
+        `[BROKER] ${config.name} token exchange for user ${user.id}...`
+      );
 
-      // Generate and store OTP
-      const otp = generateOtp();
-      const key = `${user.id}:${broker}:${cleanPhone}`;
-      otpStore.set(key, {
-        otp,
-        expiresAt: Date.now() + 5 * 60 * 1000, // 5 min expiry
-        broker,
+      const result = await config.exchangeCode({
+        code,
+        apiKey,
+        apiSecret,
+        redirectUri: redirect_uri || "",
       });
 
-      console.log(`OTP generated for ${broker} (user: ${user.id}, phone: ***${cleanPhone.slice(-4)}): ${otp}`);
+      console.log(
+        `[BROKER] ${config.name} token exchange OK. Broker user: ${result.user_name || result.user_id || "unknown"}`
+      );
 
-      // In production, integrate with SMS gateway (MSG91, Twilio, etc.)
-      // For now, log the OTP and return success
+      // Save to database
+      const displayName =
+        result.user_name ||
+        user.user_metadata?.full_name ||
+        user.email?.split("@")[0] ||
+        "Trader";
 
-      return jsonResponse({
-        success: true,
-        message: `OTP sent to +91 ${cleanPhone.slice(-4).padStart(10, "*")}`,
-        // DEV ONLY: include OTP in response for testing — remove in production!
-        dev_otp: otp,
-      });
-    }
-
-    // ═══════════════════════════════════════════
-    // ACTION: verify_otp
-    // ═══════════════════════════════════════════
-    if (action === "verify_otp") {
-      const { phone_number, broker, otp } = body;
-      if (!phone_number || !broker || !otp) {
-        return jsonResponse({ error: "Missing phone_number, broker, or otp" }, 400);
-      }
-
-      const cleanPhone = phone_number.replace(/\D/g, "");
-      const key = `${user.id}:${broker}:${cleanPhone}`;
-      const stored = otpStore.get(key);
-
-      if (!stored) {
-        return jsonResponse({ error: "No OTP found. Please request a new one." }, 400);
-      }
-
-      if (Date.now() > stored.expiresAt) {
-        otpStore.delete(key);
-        return jsonResponse({ error: "OTP expired. Please request a new one." }, 400);
-      }
-
-      if (stored.otp !== otp) {
-        return jsonResponse({ error: "Invalid OTP. Please try again." }, 400);
-      }
-
-      // OTP verified — clean up
-      otpStore.delete(key);
-
-      // Store broker connection
-      const displayName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Trader";
-
-      const { error: dbError } = await supabase.from("broker_connections").upsert({
-        user_id: user.id,
-        broker,
-        access_token: null, // No OAuth token for OTP connections
-        token_expiry: null,
-        broker_user_id: `${broker.toUpperCase()}-${cleanPhone.slice(-4)}`,
-        email: user.email || null,
-        user_name: displayName,
-        phone_number: cleanPhone,
-        is_active: true,
-        connection_method: "otp",
-      }, { onConflict: "user_id,broker" });
-
-      if (dbError) {
-        console.error("DB error storing OTP broker connection:", dbError);
-        return jsonResponse({ error: "Failed to save connection" }, 500);
-      }
-
-      return jsonResponse({
-        success: true,
-        user_name: displayName,
-        broker,
-        message: `${broker} account connected successfully via OTP`,
-      });
-    }
-
-    // ═══════════════════════════════════════════
-    // ACTION: get_status
-    // ═══════════════════════════════════════════
-    if (action === "get_status") {
-      const { data } = await supabase
+      const { error: dbError } = await supabase
         .from("broker_connections")
-        .select("broker, is_active, broker_user_id, user_name, email, token_expiry, phone_number, connection_method")
-        .eq("user_id", user.id)
-        .eq("is_active", true);
+        .upsert(
+          {
+            user_id: user.id,
+            broker,
+            access_token: result.access_token,
+            token_expiry: result.expires_in
+              ? new Date(
+                  Date.now() + result.expires_in * 1000
+                ).toISOString()
+              : new Date(
+                  Date.now() + 24 * 60 * 60 * 1000
+                ).toISOString(),
+            broker_user_id: result.user_id || null,
+            email: result.email || user.email || null,
+            user_name: displayName,
+            is_active: true,
+            connection_method: "oauth",
+          },
+          { onConflict: "user_id,broker" }
+        );
 
-      return jsonResponse({ connections: data || [] });
+      if (dbError) {
+        console.error(`[BROKER] DB error for ${config.name}:`, dbError);
+        return json({ error: "Failed to save connection to database" });
+      }
+
+      return json({
+        success: true,
+        broker,
+        broker_name: config.name,
+        user_name: displayName,
+        user_id: result.user_id,
+        email: result.email,
+      });
     }
 
-    // ═══════════════════════════════════════════
+    // ═══════════════════════════════════════
     // ACTION: disconnect
-    // ═══════════════════════════════════════════
+    // ═══════════════════════════════════════
     if (action === "disconnect") {
       const { broker } = body;
-      if (!broker) {
-        return jsonResponse({ error: "Missing broker name" }, 400);
-      }
+      if (!broker) return json({ error: "Missing broker" });
 
-      await supabase
+      const { error } = await supabase
         .from("broker_connections")
         .update({ is_active: false, access_token: null })
         .eq("user_id", user.id)
         .eq("broker", broker);
 
-      return jsonResponse({ success: true });
+      if (error) return json({ error: error.message });
+      return json({ success: true });
     }
 
-    return jsonResponse({ error: "Invalid action" }, 400);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown error";
-    console.error("Broker auth error:", msg);
-    return jsonResponse({ error: msg }, 500);
+    // ═══════════════════════════════════════
+    // ACTION: status
+    // Returns all active connections + which brokers have credentials
+    // ═══════════════════════════════════════
+    if (action === "status") {
+      const { data } = await supabase
+        .from("broker_connections")
+        .select(
+          "broker, is_active, broker_user_id, user_name, email, token_expiry, connection_method"
+        )
+        .eq("user_id", user.id)
+        .eq("is_active", true);
+
+      // Check which brokers have server-side API credentials configured
+      const configured: Record<string, boolean> = {};
+      for (const [key, config] of Object.entries(BROKER_OAUTH)) {
+        configured[key] = !!Deno.env.get(config.envKey);
+      }
+
+      return json({ connections: data || [], configured });
+    }
+
+    // ═══════════════════════════════════════
+    // LEGACY: exchange_token
+    // (Old flow — frontend sends api_key + api_secret directly)
+    // Kept for backward compatibility
+    // ═══════════════════════════════════════
+    if (action === "exchange_token") {
+      const { code, api_key, api_secret, redirect_uri, broker = "upstox" } =
+        body;
+      if (!code || !api_key || !api_secret || !redirect_uri) {
+        return json({ error: "Missing required fields" });
+      }
+
+      const config = BROKER_OAUTH[broker];
+      if (!config) return json({ error: `Unsupported broker: ${broker}` });
+
+      const result = await config.exchangeCode({
+        code,
+        apiKey: api_key,
+        apiSecret: api_secret,
+        redirectUri: redirect_uri,
+      });
+
+      const displayName =
+        result.user_name ||
+        user.user_metadata?.full_name ||
+        "Trader";
+
+      const { error: dbError } = await supabase
+        .from("broker_connections")
+        .upsert(
+          {
+            user_id: user.id,
+            broker,
+            access_token: result.access_token,
+            token_expiry: new Date(
+              Date.now() + 24 * 60 * 60 * 1000
+            ).toISOString(),
+            broker_user_id: result.user_id || null,
+            email: result.email || user.email || null,
+            user_name: displayName,
+            is_active: true,
+            connection_method: "api",
+          },
+          { onConflict: "user_id,broker" }
+        );
+
+      if (dbError) {
+        console.error("DB error:", dbError);
+        return json({ error: "Failed to save connection" });
+      }
+
+      return json({
+        success: true,
+        user_name: displayName,
+        email: result.email,
+        user_id: result.user_id,
+      });
+    }
+
+    return json({ error: `Invalid action: ${action}` });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    console.error("[BROKER] Error:", msg);
+    return json({ error: msg });
   }
 });

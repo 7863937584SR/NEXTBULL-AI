@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { Outlet } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './AppHeader';
 import { useQuery } from '@tanstack/react-query';
 import { fetchLiveMarketStatus, fetchLiveRates, fetchTickerStocks, LiveMarketStatus, LiveRates, StockTickerItem } from '@/services/liveMarketService';
+import { TerminalClock } from '@/components/ui/TerminalClock';
 
 interface NewsItem {
   title: string;
@@ -29,7 +30,6 @@ const fetchSidebarNews = async (): Promise<NewsItem[]> => {
 
 export const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
 
   // Fetch live market status and rates
   const { data: marketStatus } = useQuery({
@@ -60,19 +60,12 @@ export const AppLayout = () => {
     staleTime: 60000,
   });
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const formatChange = (value: number, isPercent: boolean = false) => {
+  const formatChange = useCallback((value: number, isPercent: boolean = false) => {
     const prefix = value >= 0 ? '▲' : '▼';
     const color = value >= 0 ? 'text-emerald-400' : 'text-red-400';
     const formatted = isPercent ? `${Math.abs(value).toFixed(2)}%` : Math.abs(value).toFixed(4);
     return <span className={color}>{prefix}{formatted}</span>;
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#050505] text-emerald-400 font-mono flex flex-col">
@@ -84,17 +77,10 @@ export const AppLayout = () => {
               <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
               <span className="text-emerald-400 font-bold text-[11px] tracking-wider">LIVE FEED</span>
             </div>
-            <div className="text-cyan-400/80 text-[11px]">
-              {currentTime.toLocaleString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-              })}
-            </div>
+            <TerminalClock
+              format="full"
+              className="text-cyan-400/80 text-[11px]"
+            />
             <div className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
               <span className="text-emerald-400 text-[10px]">
                 {marketStatus?.sessionStatus || 'CHECKING...'}

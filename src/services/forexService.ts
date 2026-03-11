@@ -24,59 +24,71 @@ export interface DetailedForexRate {
 
 // Enhanced fetch function for basic rates
 export const fetchForexRates = async (): Promise<ForexRateRow[]> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
   const url = new URL('https://api.frankfurter.app/latest');
   url.searchParams.set('from', 'USD');
   url.searchParams.set('to', 'INR,EUR,GBP,JPY,AUD,CAD,CHF');
 
-  const res = await fetch(url.toString(), {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
-  });
+  try {
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
 
-  if (!res.ok) {
-    throw new Error(`Forex API error: ${res.status}`);
+    if (!res.ok) {
+      throw new Error(`Forex API error: ${res.status}`);
+    }
+
+    const data = (await res.json()) as any;
+    const rates: Record<string, number> = data?.rates || {};
+
+    const rows: ForexRateRow[] = Object.entries(rates)
+      .map(([quote, rate]) => ({
+        pair: `USD/${quote}`,
+        rate: Number(rate),
+      }))
+      .filter((r) => Number.isFinite(r.rate));
+
+    return rows;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const data = (await res.json()) as any;
-  const rates: Record<string, number> = data?.rates || {};
-
-  const rows: ForexRateRow[] = Object.entries(rates)
-    .map(([quote, rate]) => ({
-      pair: `USD/${quote}`,
-      rate: Number(rate),
-    }))
-    .filter((r) => Number.isFinite(r.rate));
-
-  return rows;
 };
 
 // Fetch detailed forex data from multiple sources
 export const fetchDetailedForexRates = async (): Promise<DetailedForexRate[]> => {
   try {
-    // Try to fetch from Exchange Rate API for better data
-    const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-    if (!response.ok) throw new Error('Exchange rate API failed');
-    
-    const data = await response.json();
-    const rates = data.rates || {};
-    
-    // Get historical data for change calculation
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const historicalUrl = `https://api.frankfurter.app/${yesterday.toISOString().split('T')[0]}`;
-    
-    let historicalRates: Record<string, number> = {};
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
     try {
-      const histRes = await fetch(historicalUrl);
-      if (histRes.ok) {
-        const histData = await histRes.json();
-        historicalRates = histData.rates || {};
+      // Try to fetch from Exchange Rate API for better data
+      const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD', {
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error('Exchange rate API failed');
+      
+      const data = await response.json();
+      const rates = data.rates || {};
+      
+      // Get historical data for change calculation
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const historicalUrl = `https://api.frankfurter.app/${yesterday.toISOString().split('T')[0]}`;
+      
+      let historicalRates: Record<string, number> = {};
+      try {
+        const histRes = await fetch(historicalUrl, { signal: controller.signal });
+        if (histRes.ok) {
+          const histData = await histRes.json();
+          historicalRates = histData.rates || {};
+        }
+      } catch (e) {
+        console.warn('Could not fetch historical rates:', e);
       }
-    } catch (e) {
-      console.warn('Could not fetch historical rates:', e);
-    }
     
     const majorPairs = ['INR', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'SGD', 'HKD'];
     
@@ -110,6 +122,9 @@ export const fetchDetailedForexRates = async (): Promise<DetailedForexRate[]> =>
           volume: '--' // Real volume requires premium data feed
         };
       });
+    } finally {
+      clearTimeout(timeout);
+    }
   } catch (error) {
     console.error('Detailed forex fetch failed, using fallback:', error);
     // Fallback to basic rates

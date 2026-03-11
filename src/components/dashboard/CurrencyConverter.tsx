@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -157,10 +157,19 @@ export const CurrencyConverter = ({ className = '' }: CurrencyConverterProps) =>
     };
   };
 
+  // Debounced conversion — waits 500ms after the last input change before firing
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     if (amount && fromCurrency && toCurrency) {
-      convertCurrency();
+      debounceRef.current = setTimeout(() => {
+        convertCurrency();
+      }, 500);
     }
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [amount, fromCurrency, toCurrency, forexRates]);
 
   return (

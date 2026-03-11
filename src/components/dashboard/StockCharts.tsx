@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell } from 'recharts';
@@ -25,25 +26,31 @@ const chartConfig = {
   range: { label: 'Day Range (₹)' },
 };
 
-const StockCharts = ({ stocks }: StockChartsProps) => {
-  const validStocks = stocks.filter(s => !s.isError);
+const StockCharts = memo(({ stocks }: StockChartsProps) => {
+  const validStocks = useMemo(() => stocks.filter(s => !s.isError), [stocks]);
 
-  const changeData = validStocks.map(s => ({
+  const changeData = useMemo(() => validStocks.map(s => ({
     symbol: s.symbol,
     changePercent: s.changePercent,
     fill: s.changePercent >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))',
-  }));
+  })), [validStocks]);
 
-  const rangeData = validStocks.map(s => ({
+  const rangeData = useMemo(() => validStocks.map(s => ({
     symbol: s.symbol,
     high: s.high,
     low: s.low,
     price: s.price,
     range: s.high - s.low,
-  }));
+  })), [validStocks]);
 
-  const gainers = validStocks.filter(s => s.change > 0).sort((a, b) => b.changePercent - a.changePercent).slice(0, 5);
-  const losers = validStocks.filter(s => s.change < 0).sort((a, b) => a.changePercent - b.changePercent).slice(0, 5);
+  const gainers = useMemo(() => 
+    validStocks.filter(s => s.change > 0).sort((a, b) => b.changePercent - a.changePercent).slice(0, 5),
+    [validStocks]
+  );
+  const losers = useMemo(() => 
+    validStocks.filter(s => s.change < 0).sort((a, b) => a.changePercent - b.changePercent).slice(0, 5),
+    [validStocks]
+  );
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -146,6 +153,8 @@ const StockCharts = ({ stocks }: StockChartsProps) => {
       </Card>
     </div>
   );
-};
+});
+
+StockCharts.displayName = 'StockCharts';
 
 export default StockCharts;

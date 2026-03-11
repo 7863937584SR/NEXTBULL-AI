@@ -19,10 +19,12 @@ export type Database = {
           access_token: string | null
           broker: string
           broker_user_id: string | null
+          connection_method: string
           created_at: string
           email: string | null
           id: string
           is_active: boolean
+          phone_number: string | null
           token_expiry: string | null
           updated_at: string
           user_id: string
@@ -32,10 +34,12 @@ export type Database = {
           access_token?: string | null
           broker: string
           broker_user_id?: string | null
+          connection_method?: string
           created_at?: string
           email?: string | null
           id?: string
           is_active?: boolean
+          phone_number?: string | null
           token_expiry?: string | null
           updated_at?: string
           user_id: string
@@ -45,10 +49,12 @@ export type Database = {
           access_token?: string | null
           broker?: string
           broker_user_id?: string | null
+          connection_method?: string
           created_at?: string
           email?: string | null
           id?: string
           is_active?: boolean
+          phone_number?: string | null
           token_expiry?: string | null
           updated_at?: string
           user_id?: string

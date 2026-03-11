@@ -620,11 +620,10 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   PAGE TRANSITION
+   PAGE TRANSITION — Removed global main>* animation.
+   Apply .animate-fade-up class manually on components that need it.
+   The global rule was causing jank on heavy pages (charts, tables).
    ═══════════════════════════════════════════════════════════ */
-main>* {
-  animation: fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
 
 /* ═══════════════════════════════════════════════════════════
    SIDEBAR ANIMATIONS
@@ -690,72 +689,10 @@ aside nav a .absolute {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   CARD ANIMATIONS — grids of cards get staggered reveals
+   CARD ANIMATIONS — Removed global .grid > div / .grid > a animations.
+   These caused jank on pages with many grid children (Markets, Currency).
+   Apply .animate-fade-up or stagger via Tailwind classes where needed.
    ═══════════════════════════════════════════════════════════ */
-.grid>div,
-.grid>a {
-  animation: fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.grid>div:nth-child(1),
-.grid>a:nth-child(1) {
-  animation-delay: 0.03s;
-}
-
-.grid>div:nth-child(2),
-.grid>a:nth-child(2) {
-  animation-delay: 0.06s;
-}
-
-.grid>div:nth-child(3),
-.grid>a:nth-child(3) {
-  animation-delay: 0.09s;
-}
-
-.grid>div:nth-child(4),
-.grid>a:nth-child(4) {
-  animation-delay: 0.12s;
-}
-
-.grid>div:nth-child(5),
-.grid>a:nth-child(5) {
-  animation-delay: 0.15s;
-}
-
-.grid>div:nth-child(6),
-.grid>a:nth-child(6) {
-  animation-delay: 0.18s;
-}
-
-.grid>div:nth-child(7),
-.grid>a:nth-child(7) {
-  animation-delay: 0.21s;
-}
-
-.grid>div:nth-child(8),
-.grid>a:nth-child(8) {
-  animation-delay: 0.24s;
-}
-
-.grid>div:nth-child(9),
-.grid>a:nth-child(9) {
-  animation-delay: 0.27s;
-}
-
-.grid>div:nth-child(10),
-.grid>a:nth-child(10) {
-  animation-delay: 0.30s;
-}
-
-.grid>div:nth-child(11),
-.grid>a:nth-child(11) {
-  animation-delay: 0.33s;
-}
-
-.grid>div:nth-child(12),
-.grid>a:nth-child(12) {
-  animation-delay: 0.36s;
-}
 
 /* ═══════════════════════════════════════════════════════════
    BADGE ANIMATIONS
@@ -765,23 +702,17 @@ aside nav a .absolute {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   BUTTON HOVER ANIMATIONS
+   BUTTON HOVER ANIMATIONS — lightweight transitions only
+   Removed global transform: scale(0.97) on :active which
+   caused layout shifts across every interactive element.
    ═══════════════════════════════════════════════════════════ */
 button,
 a,
 [role="button"] {
-  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.2s ease,
-    background-color 0.15s ease,
+  transition: background-color 0.15s ease,
     border-color 0.15s ease,
     color 0.15s ease,
     opacity 0.15s ease;
-}
-
-button:active,
-a:active,
-[role="button"]:active {
-  transform: scale(0.97);
 }
 
 /* ═══════════════════════════════════════════════════════════

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +25,7 @@ interface LivePriceChartProps {
   stocks: StockData[];
 }
 
-const LivePriceChart = ({ stocks }: LivePriceChartProps) => {
+const LivePriceChart = memo(({ stocks }: LivePriceChartProps) => {
   const [selectedStock, setSelectedStock] = useState<string>(stocks[0]?.symbol || '');
   const [priceHistory, setPriceHistory] = useState<Record<string, PricePoint[]>>({});
 
@@ -49,11 +49,14 @@ const LivePriceChart = ({ stocks }: LivePriceChartProps) => {
   const up = currentStock ? currentStock.change >= 0 : true;
   const lineColor = up ? 'hsl(142, 76%, 36%)' : 'hsl(0, 84%, 60%)';
 
-  // Calculate Y-axis domain with padding
-  const prices = chartData.map(p => p.price);
-  const minPrice = prices.length ? Math.min(...prices) : 0;
-  const maxPrice = prices.length ? Math.max(...prices) : 0;
-  const padding = (maxPrice - minPrice) * 0.2 || maxPrice * 0.002;
+  // Memoize Y-axis domain calculations
+  const { minPrice, maxPrice, padding } = useMemo(() => {
+    const prices = chartData.map(p => p.price);
+    const min = prices.length ? Math.min(...prices) : 0;
+    const max = prices.length ? Math.max(...prices) : 0;
+    const pad = (max - min) * 0.2 || max * 0.002;
+    return { minPrice: min, maxPrice: max, padding: pad };
+  }, [chartData]);
 
   return (
     <Card className="bg-card border-border">
@@ -152,6 +155,8 @@ const LivePriceChart = ({ stocks }: LivePriceChartProps) => {
       </CardContent>
     </Card>
   );
-};
+});
+
+LivePriceChart.displayName = 'LivePriceChart';
 
 export default LivePriceChart;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,9 +19,9 @@ interface ForexRate {
 export default function CurrencyQuickWidget() {
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  // Fetch detailed forex data
+  // Fetch detailed forex data — same query key as other components to share cache
   const { data: forexData, isLoading: forexLoading, refetch: refetchForex } = useQuery({
-    queryKey: ['quick-detailed-forex'],
+    queryKey: ['detailed-forex'],
     queryFn: fetchDetailedForexRates,
     refetchInterval: 30000,
     staleTime: 12000,
@@ -41,17 +41,20 @@ export default function CurrencyQuickWidget() {
     refetchCrypto();
   };
 
-  // Convert crypto data to forex format for display
-  const cryptoAsForex: ForexRate[] = cryptoData?.slice(0, 2).map(crypto => ({
-    pair: `${crypto.symbol}/USD`,
-    rate: crypto.currentPriceUsd,
-    change: crypto.changePct24h ? (crypto.currentPriceUsd * crypto.changePct24h / 100) : 0,
-    changePercent: crypto.changePct24h || 0,
-  })) || [];
+  // Convert crypto data to forex format for display (memoized)
+  const cryptoAsForex: ForexRate[] = useMemo(() => 
+    cryptoData?.slice(0, 2).map(crypto => ({
+      pair: `${crypto.symbol}/USD`,
+      rate: crypto.currentPriceUsd,
+      change: crypto.changePct24h ? (crypto.currentPriceUsd * crypto.changePct24h / 100) : 0,
+      changePercent: crypto.changePct24h || 0,
+    })) || [],
+    [cryptoData]
+  );
 
-  // Combine forex and crypto data for display
-  const majorPairs = forexData?.slice(0, 3) || [];
-  const allCurrencies = [...majorPairs, ...cryptoAsForex].slice(0, 5);
+  // Combine forex and crypto data for display (memoized)
+  const majorPairs = useMemo(() => forexData?.slice(0, 3) || [], [forexData]);
+  const allCurrencies = useMemo(() => [...majorPairs, ...cryptoAsForex].slice(0, 5), [majorPairs, cryptoAsForex]);
 
   const renderCurrencyPair = (currency: ForexRate | DetailedForexRate, index: number) => {
     const isPositive = currency.change > 0;
