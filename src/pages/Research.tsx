@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,8 +16,18 @@ import {
   Search,
   Grid,
   List,
+  X,
+  Trash2,
+  MessageCircle,
+  Send,
+  User2,
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface ResearchItem {
   id: string;
@@ -29,6 +39,7 @@ interface ResearchItem {
   readTime: string;
   source: string;
   featured?: boolean;
+  imageUrl?: string;
 }
 
 const CATEGORIES = [
@@ -184,15 +195,196 @@ const researchItems: ResearchItem[] = [
   },
 ];
 
+type ResearchPostRow = Database['public']['Tables']['research_posts']['Row'];
+
+const formatDate = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
+};
+
+const STATIC_IDS = new Set(researchItems.map(i => i.id));
+
 const Research = () => {
+  const { isAdmin, user } = useAuth();
+  const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
+  const [remoteItems, setRemoteItems] = useState<ResearchItem[]>([]);
+  const [selectedItem, setSelectedItem] = useState<ResearchItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // ── Comments state ──
+  const [comments, setComments] = useState<Array<{
+    id: string;
+    user_name: string;
+    user_email: string;
+    content: string;
+    created_at: string;
+    user_id: string;
+  }>>([]);
+  const [newComment, setNewComment] = useState('');
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [postingComment, setPostingComment] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadResearchPosts = async () => {
+      const { data, error } = await supabase
+        .from('research_posts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Failed to load research posts:', error);
+        return;
+      }
+
+      if (!isMounted) {
+        return;
+      }
+
+      const mapped = (data ?? []).map((row: ResearchPostRow) => ({
+        id: row.id,
+        category: row.category as ResearchItem['category'],
+        date: formatDate(row.created_at),
+        title: row.title,
+        description: row.description,
+        tag: row.tag,
+        readTime: row.read_time,
+        source: row.source,
+        featured: row.featured ?? false,
+        imageUrl: row.image_url ?? undefined,
+      }));
+
+      setRemoteItems(mapped);
+    };
+
+    loadResearchPosts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // ── Load comments for selected post ──
+  const loadComments = useCallback(async (postId: string) => {
+    setLoadingComments(true);
+    const { data, error } = await supabase
+      .from('research_comments')
+      .select('*')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true });
+
+    if (!error && data) {
+      setComments(data);
+    } else {
+      setComments([]);
+    }
+    setLoadingComments(false);
+  }, []);
+
+  useEffect(() => {
+    if (selectedItem) {
+      loadComments(selectedItem.id);
+    } else {
+      setComments([]);
+      setNewComment('');
+    }
+  }, [selectedItem, loadComments]);
+
+  const handlePostComment = async () => {
+    if (!newComment.trim() || !user || !selectedItem) return;
+    setPostingComment(true);
+
+    const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Anonymous';
+
+    const { error } = await supabase.from('research_comments').insert({
+      post_id: selectedItem.id,
+      user_id: user.id,
+      user_email: user.email || '',
+      user_name: userName,
+      content: newComment.trim(),
+    });
+
+    if (error) {
+      toast({ title: 'Failed to post comment', description: error.message, variant: 'destructive' });
+    } else {
+      setNewComment('');
+      await loadComments(selectedItem.id);
+    }
+    setPostingComment(false);
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    setDeletingCommentId(commentId);
+    const { error } = await supabase.from('research_comments').delete().eq('id', commentId);
+    if (error) {
+      toast({ title: 'Failed to delete', description: error.message, variant: 'destructive' });
+    } else if (selectedItem) {
+      await loadComments(selectedItem.id);
+    }
+    setDeletingCommentId(null);
+  };
+
+  const loadPosts = useCallback(async () => {
+    const { data } = await supabase
+      .from('research_posts')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    const mapped = (data ?? []).map((row: ResearchPostRow) => ({
+      id: row.id,
+      category: row.category as ResearchItem['category'],
+      date: formatDate(row.created_at),
+      title: row.title,
+      description: row.description,
+      tag: row.tag,
+      readTime: row.read_time,
+      source: row.source,
+      featured: row.featured ?? false,
+      imageUrl: row.image_url ?? undefined,
+    }));
+
+    setRemoteItems(mapped);
+  }, []);
+
+  const handleDelete = async (item: ResearchItem) => {
+    if (STATIC_IDS.has(item.id)) return;
+    setIsDeleting(true);
+
+    const { error } = await supabase.from('research_posts').delete().eq('id', item.id);
+
+    if (error) {
+      toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
+      setIsDeleting(false);
+      return;
+    }
+
+    toast({ title: 'Deleted', description: 'Research post removed.' });
+    setSelectedItem(null);
+    setIsDeleting(false);
+    await loadPosts();
+  };
+
+  const allItems = useMemo(() => [
+    ...remoteItems,
+    ...researchItems,
+  ], [remoteItems]);
 
   const filteredItems = useMemo(() => {
     let items = activeCategory === 'all'
-      ? researchItems
-      : researchItems.filter(item => item.category === activeCategory);
+      ? allItems
+      : allItems.filter(item => item.category === activeCategory);
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -205,12 +397,149 @@ const Research = () => {
     }
 
     return items;
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, searchQuery, allItems]);
 
-  const featuredItems = researchItems.filter(item => item.featured);
+  const featuredItems = allItems.filter(item => item.featured);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-8">
+      {/* ── DETAIL MODAL ── */}
+      {selectedItem && (() => {
+        const colors = CATEGORY_COLORS[selectedItem.category];
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setSelectedItem(null)} />
+            <div className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-[#1a1e2a] border border-white/10 rounded-2xl shadow-2xl">
+              <button
+                onClick={() => setSelectedItem(null)}
+                className="absolute top-4 right-4 z-10 bg-black/50 hover:bg-black/70 rounded-full p-1.5 transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+              {selectedItem.imageUrl && (
+                <div className="w-full h-56 overflow-hidden rounded-t-2xl">
+                  <img src={selectedItem.imageUrl} alt={selectedItem.title} className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="p-6 sm:p-8 space-y-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className={`${colors.bg} ${colors.text} border-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5`}>
+                    {selectedItem.tag}
+                  </Badge>
+                  <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                    <Calendar className="w-3 h-3" /> {selectedItem.date}
+                  </span>
+                  <span className="text-[11px] text-gray-500">{selectedItem.readTime}</span>
+                </div>
+                <h2 className="text-2xl font-bold text-white leading-tight">{selectedItem.title}</h2>
+                <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">{selectedItem.description}</p>
+                <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Source: {selectedItem.source}</span>
+                  {isAdmin && !STATIC_IDS.has(selectedItem.id) && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={isDeleting}
+                      onClick={() => handleDelete(selectedItem)}
+                      className="gap-1.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      {isDeleting ? 'Deleting...' : 'Delete'}
+                    </Button>
+                  )}
+                </div>
+
+                {/* ── COMMENTS SECTION ── */}
+                <div className="pt-5 border-t border-white/10 space-y-4">
+                  <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2">
+                    <MessageCircle className="w-4 h-4" />
+                    Comments ({comments.length})
+                  </h3>
+
+                  {/* Comment input */}
+                  {user ? (
+                    <div className="flex gap-2">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                        <User2 className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Textarea
+                          placeholder="Share your thoughts..."
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          className="min-h-[60px] text-sm bg-black/20 border-white/10 focus:border-primary/40 resize-none"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                              handlePostComment();
+                            }
+                          }}
+                        />
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-gray-500">Ctrl+Enter to post</span>
+                          <Button
+                            size="sm"
+                            disabled={!newComment.trim() || postingComment}
+                            onClick={handlePostComment}
+                            className="gap-1.5 h-7 text-xs"
+                          >
+                            <Send className="w-3 h-3" />
+                            {postingComment ? 'Posting...' : 'Post'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 text-center py-3 bg-black/10 rounded-lg">
+                      Please log in to leave a comment.
+                    </p>
+                  )}
+
+                  {/* Comment list */}
+                  {loadingComments ? (
+                    <p className="text-xs text-gray-500 text-center py-3">Loading comments...</p>
+                  ) : comments.length === 0 ? (
+                    <p className="text-xs text-gray-500 text-center py-3">
+                      No comments yet. Be the first to share your thoughts!
+                    </p>
+                  ) : (
+                    <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                      {comments.map((c) => (
+                        <div key={c.id} className="flex gap-2 group/comment">
+                          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-500/15 flex items-center justify-center mt-0.5">
+                            <span className="text-[10px] font-bold text-emerald-400 uppercase">
+                              {c.user_name?.charAt(0) || '?'}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-gray-300">{c.user_name}</span>
+                              <span className="text-[10px] text-gray-600">
+                                {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                {' '}
+                                {new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {(user?.id === c.user_id || isAdmin) && (
+                                <button
+                                  onClick={() => handleDeleteComment(c.id)}
+                                  disabled={deletingCommentId === c.id}
+                                  className="opacity-0 group-hover/comment:opacity-100 transition-opacity text-gray-600 hover:text-red-400 ml-auto"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-400 mt-0.5 whitespace-pre-wrap break-words">{c.content}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {/* ── HEADER ── */}
       <div>
         <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Research & Insights</h1>
@@ -226,6 +555,7 @@ const Research = () => {
           return (
             <Card
               key={item.id}
+              onClick={() => setSelectedItem(item)}
               className={`relative overflow-hidden bg-gradient-to-br ${GRADIENT_MAP[item.category]} border ${colors.border} hover:scale-[1.01] transition-all duration-300 cursor-pointer group`}
             >
               {/* Featured ribbon */}
@@ -236,6 +566,11 @@ const Research = () => {
               </div>
               {/* Decorative glow */}
               <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full ${colors.bg} blur-3xl opacity-40`} />
+              {item.imageUrl && (
+                <div className="w-full h-40 overflow-hidden">
+                  <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+                </div>
+              )}
               <CardContent className="p-6 relative z-10">
                 <div className="flex items-center gap-2 mb-3">
                   <Badge variant="outline" className={`${colors.bg} ${colors.text} border-0 text-[10px] font-semibold uppercase tracking-wider`}>
@@ -340,7 +675,7 @@ const Research = () => {
             }
 
             return (
-              <div key={item.id} className="relative group perspective-1000 cursor-pointer h-full">
+              <div key={item.id} className="relative group perspective-1000 cursor-pointer h-full" onClick={() => setSelectedItem(item)}>
                 {/* Expand out background glow */}
                 <div
                   className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 blur-xl transition-all duration-500 will-change-transform"
@@ -356,6 +691,12 @@ const Research = () => {
 
                   {/* Top vibrant accent line */}
                   <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${GRADIENT_MAP[item.category].replace('via-transparent to-transparent', 'to-transparent')} shadow-[0_0_15px_currentColor]`} />
+
+                  {item.imageUrl && (
+                    <div className="w-full h-36 overflow-hidden rounded-t-2xl">
+                      <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+                    </div>
+                  )}
 
                   <CardContent className="p-6 flex flex-col h-full relative z-10">
                     <div className="flex items-center gap-2 mb-4">
@@ -398,7 +739,7 @@ const Research = () => {
             }
 
             return (
-              <div key={item.id} className="relative group perspective-1000 cursor-pointer">
+              <div key={item.id} className="relative group perspective-1000 cursor-pointer" onClick={() => setSelectedItem(item)}>
                 <div
                   className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 blur-xl transition-all duration-500 will-change-transform"
                   style={{ background: getHexGlow(item.category) }}

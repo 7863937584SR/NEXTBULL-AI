@@ -408,6 +408,329 @@ async function fetchYahooRaw(symbol: string): Promise<{ price: number; prevClose
   } catch { return null; }
 }
 
+// ═══ Timeout wrapper for all fetches ═══
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
+// ═══ Comprehensive Stock Name → Yahoo Symbol Map (150+ Indian stocks) ═══
+const STOCK_SYMBOL_MAP: Record<string, { sym: string; name: string }> = {
+  // NIFTY 50 Components
+  "reliance": { sym: "RELIANCE.NS", name: "Reliance" },
+  "tcs": { sym: "TCS.NS", name: "TCS" },
+  "infosys": { sym: "INFY.NS", name: "Infosys" },
+  "infy": { sym: "INFY.NS", name: "Infosys" },
+  "hdfc bank": { sym: "HDFCBANK.NS", name: "HDFC Bank" },
+  "hdfcbank": { sym: "HDFCBANK.NS", name: "HDFC Bank" },
+  "icici bank": { sym: "ICICIBANK.NS", name: "ICICI Bank" },
+  "icicibank": { sym: "ICICIBANK.NS", name: "ICICI Bank" },
+  "icici": { sym: "ICICIBANK.NS", name: "ICICI Bank" },
+  "itc": { sym: "ITC.NS", name: "ITC" },
+  "bharti airtel": { sym: "BHARTIARTL.NS", name: "Bharti Airtel" },
+  "airtel": { sym: "BHARTIARTL.NS", name: "Bharti Airtel" },
+  "sbi": { sym: "SBIN.NS", name: "SBI" },
+  "state bank": { sym: "SBIN.NS", name: "SBI" },
+  "tata motors": { sym: "TATAMOTORS.NS", name: "Tata Motors" },
+  "l&t": { sym: "LT.NS", name: "L&T" },
+  "larsen": { sym: "LT.NS", name: "L&T" },
+  "wipro": { sym: "WIPRO.NS", name: "Wipro" },
+  "adani enterprises": { sym: "ADANIENT.NS", name: "Adani Ent" },
+  "adani ent": { sym: "ADANIENT.NS", name: "Adani Ent" },
+  "bajaj finance": { sym: "BAJFINANCE.NS", name: "Bajaj Finance" },
+  "bajfinance": { sym: "BAJFINANCE.NS", name: "Bajaj Finance" },
+  "maruti": { sym: "MARUTI.NS", name: "Maruti Suzuki" },
+  "maruti suzuki": { sym: "MARUTI.NS", name: "Maruti Suzuki" },
+  "sun pharma": { sym: "SUNPHARMA.NS", name: "Sun Pharma" },
+  "sunpharma": { sym: "SUNPHARMA.NS", name: "Sun Pharma" },
+  "tata steel": { sym: "TATASTEEL.NS", name: "Tata Steel" },
+  "kotak": { sym: "KOTAKBANK.NS", name: "Kotak Bank" },
+  "kotak bank": { sym: "KOTAKBANK.NS", name: "Kotak Bank" },
+  "kotakbank": { sym: "KOTAKBANK.NS", name: "Kotak Bank" },
+  "axis bank": { sym: "AXISBANK.NS", name: "Axis Bank" },
+  "axisbank": { sym: "AXISBANK.NS", name: "Axis Bank" },
+  "hcl tech": { sym: "HCLTECH.NS", name: "HCL Tech" },
+  "hcltech": { sym: "HCLTECH.NS", name: "HCL Tech" },
+  "m&m": { sym: "M&M.NS", name: "M&M" },
+  "mahindra": { sym: "M&M.NS", name: "M&M" },
+  // Additional NIFTY 50
+  "asian paints": { sym: "ASIANPAINT.NS", name: "Asian Paints" },
+  "asianpaint": { sym: "ASIANPAINT.NS", name: "Asian Paints" },
+  "bajaj finserv": { sym: "BAJAJFINSV.NS", name: "Bajaj Finserv" },
+  "bajajfinsv": { sym: "BAJAJFINSV.NS", name: "Bajaj Finserv" },
+  "britannia": { sym: "BRITANNIA.NS", name: "Britannia" },
+  "cipla": { sym: "CIPLA.NS", name: "Cipla" },
+  "coal india": { sym: "COALINDIA.NS", name: "Coal India" },
+  "coalindia": { sym: "COALINDIA.NS", name: "Coal India" },
+  "divis lab": { sym: "DIVISLAB.NS", name: "Divi's Labs" },
+  "divislab": { sym: "DIVISLAB.NS", name: "Divi's Labs" },
+  "divi's labs": { sym: "DIVISLAB.NS", name: "Divi's Labs" },
+  "dr reddy": { sym: "DRREDDY.NS", name: "Dr Reddy's" },
+  "drreddy": { sym: "DRREDDY.NS", name: "Dr Reddy's" },
+  "eicher motors": { sym: "EICHERMOT.NS", name: "Eicher Motors" },
+  "eichermot": { sym: "EICHERMOT.NS", name: "Eicher Motors" },
+  "grasim": { sym: "GRASIM.NS", name: "Grasim" },
+  "hero motocorp": { sym: "HEROMOTOCO.NS", name: "Hero MotoCorp" },
+  "heromotoco": { sym: "HEROMOTOCO.NS", name: "Hero MotoCorp" },
+  "hindalco": { sym: "HINDALCO.NS", name: "Hindalco" },
+  "hindustan unilever": { sym: "HINDUNILVR.NS", name: "HUL" },
+  "hul": { sym: "HINDUNILVR.NS", name: "HUL" },
+  "hindunilvr": { sym: "HINDUNILVR.NS", name: "HUL" },
+  "indusind bank": { sym: "INDUSINDBK.NS", name: "IndusInd Bank" },
+  "indusindbk": { sym: "INDUSINDBK.NS", name: "IndusInd Bank" },
+  "jswsteel": { sym: "JSWSTEEL.NS", name: "JSW Steel" },
+  "jsw steel": { sym: "JSWSTEEL.NS", name: "JSW Steel" },
+  "nestle": { sym: "NESTLEIND.NS", name: "Nestle India" },
+  "nestleind": { sym: "NESTLEIND.NS", name: "Nestle India" },
+  "ntpc": { sym: "NTPC.NS", name: "NTPC" },
+  "ongc": { sym: "ONGC.NS", name: "ONGC" },
+  "power grid": { sym: "POWERGRID.NS", name: "Power Grid" },
+  "powergrid": { sym: "POWERGRID.NS", name: "Power Grid" },
+  "tata consumer": { sym: "TATACONSUM.NS", name: "Tata Consumer" },
+  "tataconsum": { sym: "TATACONSUM.NS", name: "Tata Consumer" },
+  "tech mahindra": { sym: "TECHM.NS", name: "Tech Mahindra" },
+  "techm": { sym: "TECHM.NS", name: "Tech Mahindra" },
+  "titan": { sym: "TITAN.NS", name: "Titan" },
+  "ultratech cement": { sym: "ULTRACEMCO.NS", name: "UltraTech Cement" },
+  "ultracemco": { sym: "ULTRACEMCO.NS", name: "UltraTech Cement" },
+  "ultratech": { sym: "ULTRACEMCO.NS", name: "UltraTech Cement" },
+  "upl": { sym: "UPL.NS", name: "UPL" },
+  "adani ports": { sym: "ADANIPORTS.NS", name: "Adani Ports" },
+  "adaniports": { sym: "ADANIPORTS.NS", name: "Adani Ports" },
+  "apollo hospital": { sym: "APOLLOHOSP.NS", name: "Apollo Hospitals" },
+  "apollohosp": { sym: "APOLLOHOSP.NS", name: "Apollo Hospitals" },
+  "bpcl": { sym: "BPCL.NS", name: "BPCL" },
+  "sbilife": { sym: "SBILIFE.NS", name: "SBI Life" },
+  "sbi life": { sym: "SBILIFE.NS", name: "SBI Life" },
+  "hdfc life": { sym: "HDFCLIFE.NS", name: "HDFC Life" },
+  "hdfclife": { sym: "HDFCLIFE.NS", name: "HDFC Life" },
+  "trent": { sym: "TRENT.NS", name: "Trent" },
+  "shriram finance": { sym: "SHRIRAMFIN.NS", name: "Shriram Finance" },
+  "shriramfin": { sym: "SHRIRAMFIN.NS", name: "Shriram Finance" },
+  "bajaj auto": { sym: "BAJAJ-AUTO.NS", name: "Bajaj Auto" },
+  // Popular Mid-caps & Others
+  "zomato": { sym: "ZOMATO.NS", name: "Zomato" },
+  "paytm": { sym: "PAYTM.NS", name: "Paytm" },
+  "nykaa": { sym: "NYKAA.NS", name: "Nykaa" },
+  "policybazaar": { sym: "POLICYBZR.NS", name: "PB Fintech" },
+  "pb fintech": { sym: "POLICYBZR.NS", name: "PB Fintech" },
+  "delhivery": { sym: "DELHIVERY.NS", name: "Delhivery" },
+  "vedanta": { sym: "VEDL.NS", name: "Vedanta" },
+  "vedl": { sym: "VEDL.NS", name: "Vedanta" },
+  "ioc": { sym: "IOC.NS", name: "IOC" },
+  "indian oil": { sym: "IOC.NS", name: "IOC" },
+  "gail": { sym: "GAIL.NS", name: "GAIL" },
+  "tata power": { sym: "TATAPOWER.NS", name: "Tata Power" },
+  "tatapower": { sym: "TATAPOWER.NS", name: "Tata Power" },
+  "adani green": { sym: "ADANIGREEN.NS", name: "Adani Green" },
+  "adanigreen": { sym: "ADANIGREEN.NS", name: "Adani Green" },
+  "adani power": { sym: "ADANIPOWER.NS", name: "Adani Power" },
+  "adanipower": { sym: "ADANIPOWER.NS", name: "Adani Power" },
+  "vodafone idea": { sym: "IDEA.NS", name: "Vodafone Idea" },
+  "vi": { sym: "IDEA.NS", name: "Vodafone Idea" },
+  "jio financial": { sym: "JIOFIN.NS", name: "Jio Financial" },
+  "jiofin": { sym: "JIOFIN.NS", name: "Jio Financial" },
+  "ltimindtree": { sym: "LTIM.NS", name: "LTIMindtree" },
+  "ltim": { sym: "LTIM.NS", name: "LTIMindtree" },
+  "persistent": { sym: "PERSISTENT.NS", name: "Persistent Systems" },
+  "coforge": { sym: "COFORGE.NS", name: "Coforge" },
+  "mphasis": { sym: "MPHASIS.NS", name: "Mphasis" },
+  "idfc first": { sym: "IDFCFIRSTB.NS", name: "IDFC First Bank" },
+  "idfcfirstb": { sym: "IDFCFIRSTB.NS", name: "IDFC First Bank" },
+  "federal bank": { sym: "FEDERALBNK.NS", name: "Federal Bank" },
+  "federalbnk": { sym: "FEDERALBNK.NS", name: "Federal Bank" },
+  "bandhan bank": { sym: "BANDHANBNK.NS", name: "Bandhan Bank" },
+  "bandhanbnk": { sym: "BANDHANBNK.NS", name: "Bandhan Bank" },
+  "bank of baroda": { sym: "BANKBARODA.NS", name: "Bank of Baroda" },
+  "bankbaroda": { sym: "BANKBARODA.NS", name: "Bank of Baroda" },
+  "bob": { sym: "BANKBARODA.NS", name: "Bank of Baroda" },
+  "pnb": { sym: "PNB.NS", name: "PNB" },
+  "punjab national bank": { sym: "PNB.NS", name: "PNB" },
+  "canara bank": { sym: "CANBK.NS", name: "Canara Bank" },
+  "canbk": { sym: "CANBK.NS", name: "Canara Bank" },
+  "cholamandalam": { sym: "CHOLAFIN.NS", name: "Cholamandalam" },
+  "cholafin": { sym: "CHOLAFIN.NS", name: "Cholamandalam" },
+  "muthoot": { sym: "MUTHOOTFIN.NS", name: "Muthoot Finance" },
+  "muthootfin": { sym: "MUTHOOTFIN.NS", name: "Muthoot Finance" },
+  "manappuram": { sym: "MANAPPURAM.NS", name: "Manappuram" },
+  "lupin": { sym: "LUPIN.NS", name: "Lupin" },
+  "biocon": { sym: "BIOCON.NS", name: "Biocon" },
+  "aurobindo pharma": { sym: "AUROPHARMA.NS", name: "Aurobindo Pharma" },
+  "auropharma": { sym: "AUROPHARMA.NS", name: "Aurobindo Pharma" },
+  "dabur": { sym: "DABUR.NS", name: "Dabur" },
+  "godrej consumer": { sym: "GODREJCP.NS", name: "Godrej Consumer" },
+  "godrejcp": { sym: "GODREJCP.NS", name: "Godrej Consumer" },
+  "marico": { sym: "MARICO.NS", name: "Marico" },
+  "colgate": { sym: "COLPAL.NS", name: "Colgate" },
+  "colpal": { sym: "COLPAL.NS", name: "Colgate" },
+  "nmdc": { sym: "NMDC.NS", name: "NMDC" },
+  "nalco": { sym: "NATIONALUM.NS", name: "Nalco" },
+  "nationalum": { sym: "NATIONALUM.NS", name: "Nalco" },
+  "tvs motor": { sym: "TVSMOTOR.NS", name: "TVS Motor" },
+  "tvsmotor": { sym: "TVSMOTOR.NS", name: "TVS Motor" },
+  "ashok leyland": { sym: "ASHOKLEY.NS", name: "Ashok Leyland" },
+  "ashokley": { sym: "ASHOKLEY.NS", name: "Ashok Leyland" },
+  "havells": { sym: "HAVELLS.NS", name: "Havells" },
+  "pidilite": { sym: "PIDILITIND.NS", name: "Pidilite" },
+  "pidilitind": { sym: "PIDILITIND.NS", name: "Pidilite" },
+  "siemens": { sym: "SIEMENS.NS", name: "Siemens" },
+  "abb": { sym: "ABB.NS", name: "ABB India" },
+  "dixon": { sym: "DIXON.NS", name: "Dixon Tech" },
+  "irctc": { sym: "IRCTC.NS", name: "IRCTC" },
+  "hal": { sym: "HAL.NS", name: "HAL" },
+  "bhel": { sym: "BHEL.NS", name: "BHEL" },
+  "sail": { sym: "SAIL.NS", name: "SAIL" },
+  "lic": { sym: "LICI.NS", name: "LIC" },
+  "lici": { sym: "LICI.NS", name: "LIC" },
+  "sbicard": { sym: "SBICARD.NS", name: "SBI Cards" },
+  "sbi cards": { sym: "SBICARD.NS", name: "SBI Cards" },
+  "icici prudential": { sym: "ICICIPRULI.NS", name: "ICICI Pru Life" },
+  "icicipruli": { sym: "ICICIPRULI.NS", name: "ICICI Pru Life" },
+  "icici lombard": { sym: "ICICIGI.NS", name: "ICICI Lombard" },
+  "icicigi": { sym: "ICICIGI.NS", name: "ICICI Lombard" },
+  "max health": { sym: "MAXHEALTH.NS", name: "Max Healthcare" },
+  "maxhealth": { sym: "MAXHEALTH.NS", name: "Max Healthcare" },
+  "page industries": { sym: "PAGEIND.NS", name: "Page Industries" },
+  "pageind": { sym: "PAGEIND.NS", name: "Page Industries" },
+  "info edge": { sym: "NAUKRI.NS", name: "Info Edge (Naukri)" },
+  "naukri": { sym: "NAUKRI.NS", name: "Info Edge (Naukri)" },
+  "indigo": { sym: "INDIGO.NS", name: "InterGlobe Aviation" },
+  "interglobe": { sym: "INDIGO.NS", name: "InterGlobe Aviation" },
+  "dmart": { sym: "DMART.NS", name: "Avenue Supermarts" },
+  "avenue supermarts": { sym: "DMART.NS", name: "Avenue Supermarts" },
+  "motherson": { sym: "MOTHERSON.NS", name: "Motherson Sumi" },
+  "srf": { sym: "SRF.NS", name: "SRF" },
+  "tata elxsi": { sym: "TATAELXSI.NS", name: "Tata Elxsi" },
+  "tataelxsi": { sym: "TATAELXSI.NS", name: "Tata Elxsi" },
+  "iex": { sym: "IEX.NS", name: "IEX" },
+  "deepak nitrite": { sym: "DEEPAKNTR.NS", name: "Deepak Nitrite" },
+  "deepakntr": { sym: "DEEPAKNTR.NS", name: "Deepak Nitrite" },
+  "polycab": { sym: "POLYCAB.NS", name: "Polycab" },
+  "astral": { sym: "ASTRAL.NS", name: "Astral" },
+  "atul": { sym: "ATUL.NS", name: "Atul" },
+  "crompton": { sym: "CROMPTON.NS", name: "Crompton Greaves" },
+  "voltas": { sym: "VOLTAS.NS", name: "Voltas" },
+  "whirlpool": { sym: "WHIRLPOOL.NS", name: "Whirlpool India" },
+  "mapmyindia": { sym: "MAPMYINDIA.NS", name: "MapMyIndia" },
+  "angel one": { sym: "ANGELONE.NS", name: "Angel One" },
+  "angelone": { sym: "ANGELONE.NS", name: "Angel One" },
+  "cdsl": { sym: "CDSL.NS", name: "CDSL" },
+  "bse": { sym: "BSE.NS", name: "BSE Ltd" },
+  "suzlon": { sym: "SUZLON.NS", name: "Suzlon Energy" },
+  "nhpc": { sym: "NHPC.NS", name: "NHPC" },
+  "ireda": { sym: "IREDA.NS", name: "IREDA" },
+  "rvnl": { sym: "RVNL.NS", name: "RVNL" },
+  "cochin shipyard": { sym: "COCHINSHIP.NS", name: "Cochin Shipyard" },
+  "cochinship": { sym: "COCHINSHIP.NS", name: "Cochin Shipyard" },
+  "mazagon dock": { sym: "MAZDOCK.NS", name: "Mazagon Dock" },
+  "mazdock": { sym: "MAZDOCK.NS", name: "Mazagon Dock" },
+  "bel": { sym: "BEL.NS", name: "BEL" },
+  "rec": { sym: "RECLTD.NS", name: "REC" },
+  "recltd": { sym: "RECLTD.NS", name: "REC" },
+  "pfc": { sym: "PFC.NS", name: "PFC" },
+  // US Stocks (popular among Indian traders)
+  "apple": { sym: "AAPL", name: "Apple" },
+  "aapl": { sym: "AAPL", name: "Apple" },
+  "microsoft": { sym: "MSFT", name: "Microsoft" },
+  "msft": { sym: "MSFT", name: "Microsoft" },
+  "google": { sym: "GOOGL", name: "Alphabet (Google)" },
+  "googl": { sym: "GOOGL", name: "Alphabet (Google)" },
+  "alphabet": { sym: "GOOGL", name: "Alphabet (Google)" },
+  "amazon": { sym: "AMZN", name: "Amazon" },
+  "amzn": { sym: "AMZN", name: "Amazon" },
+  "nvidia": { sym: "NVDA", name: "NVIDIA" },
+  "nvda": { sym: "NVDA", name: "NVIDIA" },
+  "tesla": { sym: "TSLA", name: "Tesla" },
+  "tsla": { sym: "TSLA", name: "Tesla" },
+  "meta": { sym: "META", name: "Meta Platforms" },
+  "netflix": { sym: "NFLX", name: "Netflix" },
+  "nflx": { sym: "NFLX", name: "Netflix" },
+  "amd": { sym: "AMD", name: "AMD" },
+  "intel": { sym: "INTC", name: "Intel" },
+  "intc": { sym: "INTC", name: "Intel" },
+};
+
+// Set of symbols already fetched in the top stocks list (to avoid duplicates)
+const TOP_STOCK_SYMBOLS = new Set([
+  "RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS",
+  "ITC.NS", "BHARTIARTL.NS", "SBIN.NS", "TATAMOTORS.NS", "LT.NS",
+  "WIPRO.NS", "ADANIENT.NS", "BAJFINANCE.NS", "MARUTI.NS", "SUNPHARMA.NS",
+  "TATASTEEL.NS", "KOTAKBANK.NS", "AXISBANK.NS", "HCLTECH.NS", "M&M.NS",
+  // Extended stocks added below
+  "ASIANPAINT.NS", "BAJAJFINSV.NS", "BRITANNIA.NS", "CIPLA.NS", "COALINDIA.NS",
+  "DIVISLAB.NS", "DRREDDY.NS", "EICHERMOT.NS", "GRASIM.NS", "HEROMOTOCO.NS",
+  "HINDALCO.NS", "HINDUNILVR.NS", "INDUSINDBK.NS", "JSWSTEEL.NS", "NESTLEIND.NS",
+  "NTPC.NS", "ONGC.NS", "POWERGRID.NS", "TATACONSUM.NS", "TECHM.NS",
+  "TITAN.NS", "ULTRACEMCO.NS", "UPL.NS", "ADANIPORTS.NS", "APOLLOHOSP.NS",
+  "BPCL.NS", "SBILIFE.NS", "HDFCLIFE.NS", "TRENT.NS", "SHRIRAMFIN.NS", "BAJAJ-AUTO.NS",
+]);
+
+// Extract mentioned stocks from user's latest message
+function extractMentionedStocks(messages: any[]): { sym: string; name: string }[] {
+  // Get the latest user message text
+  const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
+  if (!lastUserMsg) return [];
+
+  let text = "";
+  if (typeof lastUserMsg.content === "string") {
+    text = lastUserMsg.content.toLowerCase();
+  } else if (Array.isArray(lastUserMsg.content)) {
+    text = lastUserMsg.content
+      .filter((p: any) => p.type === "text")
+      .map((p: any) => p.text)
+      .join(" ")
+      .toLowerCase();
+  }
+  if (!text) return [];
+
+  const found = new Map<string, { sym: string; name: string }>();
+
+  // Check each key in the map — sort by length descending to match longer names first
+  const sortedKeys = Object.keys(STOCK_SYMBOL_MAP).sort((a, b) => b.length - a.length);
+  for (const key of sortedKeys) {
+    // Word boundary check (allow partial at start/end of string)
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(?:^|\\s|\\b)${escaped}(?:\\s|\\b|$|'s|\\?)`, "i");
+    if (regex.test(text)) {
+      const entry = STOCK_SYMBOL_MAP[key];
+      if (!TOP_STOCK_SYMBOLS.has(entry.sym) && !found.has(entry.sym)) {
+        found.set(entry.sym, entry);
+      }
+    }
+  }
+
+  return [...found.values()];
+}
+
+// Fetch dynamically mentioned stocks not in the top list
+async function fetchDynamicStocks(messages: any[]): Promise<string> {
+  try {
+    const mentioned = extractMentionedStocks(messages);
+    if (mentioned.length === 0) return "";
+
+    const results = await Promise.allSettled(
+      mentioned.map(s => withTimeout(fetchYahooRaw(s.sym), 8000, null))
+    );
+
+    let report = "\n🔍 ADDITIONAL STOCK DATA (requested by user):\n";
+    let hasData = false;
+
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled" && r.value) {
+        const d = r.value;
+        hasData = true;
+        const isUS = !mentioned[i].sym.endsWith(".NS");
+        const currency = isUS ? "$" : "₹";
+        report += `   ${mentioned[i].name.padEnd(20)} ${currency}${d.price.toFixed(2).padStart(10)} ${d.chg >= 0 ? "+" : ""}${d.pct.toFixed(2).padStart(7)}%  H:${d.high.toFixed(2)} L:${d.low.toFixed(2)}  Vol:${formatVol(d.vol)}\n`;
+      }
+    });
+
+    return hasData ? report : "";
+  } catch { return ""; }
+}
+
 async function fetchNSEData(): Promise<string> {
   try {
     const now = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
@@ -415,9 +738,9 @@ async function fetchNSEData(): Promise<string> {
 
     // Fetch indices from Yahoo Finance (Works reliably from Datacenters unlike NSE.com)
     const [nifty, bank, it] = await Promise.allSettled([
-      fetchYahooData("^NSEI", "NIFTY 50"),
-      fetchYahooData("^NSEBANK", "BANK NIFTY"),
-      fetchYahooData("^CNXIT", "NIFTY IT")
+      withTimeout(fetchYahooData("^NSEI", "NIFTY 50"), 10000, ""),
+      withTimeout(fetchYahooData("^NSEBANK", "BANK NIFTY"), 10000, ""),
+      withTimeout(fetchYahooData("^CNXIT", "NIFTY IT"), 10000, "")
     ]);
 
     let report = `\n📊 LIVE INDIAN MARKET DATA (via YFinance)\n📅 ${dateIST} | ⏰ ${now} IST\n${"━".repeat(50)}\n`;
@@ -442,7 +765,7 @@ async function fetchExtendedIndices(): Promise<string> {
       { sym: "^CNXFIN", name: "NIFTY FinService" },
       { sym: "^CNXAUTO", name: "NIFTY Auto" },
     ];
-    const results = await Promise.allSettled(symbols.map(s => fetchYahooData(s.sym, s.name)));
+    const results = await Promise.allSettled(symbols.map(s => withTimeout(fetchYahooData(s.sym, s.name), 8000, "")));
     let report = "";
     results.forEach(r => { if (r.status === "fulfilled" && r.value) report += r.value; });
     return report ? `\n📊 EXTENDED INDICES:\n${report}` : "";
@@ -453,6 +776,7 @@ async function fetchExtendedIndices(): Promise<string> {
 async function fetchTopStocks(): Promise<string> {
   try {
     const stocks = [
+      // Original Top 20
       { sym: "RELIANCE.NS", name: "Reliance" },
       { sym: "TCS.NS", name: "TCS" },
       { sym: "INFY.NS", name: "Infosys" },
@@ -473,21 +797,64 @@ async function fetchTopStocks(): Promise<string> {
       { sym: "AXISBANK.NS", name: "Axis Bank" },
       { sym: "HCLTECH.NS", name: "HCL Tech" },
       { sym: "M&M.NS", name: "M&M" },
+      // Remaining NIFTY 50 components
+      { sym: "ASIANPAINT.NS", name: "Asian Paints" },
+      { sym: "BAJAJFINSV.NS", name: "Bajaj Finserv" },
+      { sym: "BRITANNIA.NS", name: "Britannia" },
+      { sym: "CIPLA.NS", name: "Cipla" },
+      { sym: "COALINDIA.NS", name: "Coal India" },
+      { sym: "DIVISLAB.NS", name: "Divi's Labs" },
+      { sym: "DRREDDY.NS", name: "Dr Reddy's" },
+      { sym: "EICHERMOT.NS", name: "Eicher Motors" },
+      { sym: "GRASIM.NS", name: "Grasim" },
+      { sym: "HEROMOTOCO.NS", name: "Hero MotoCorp" },
+      { sym: "HINDALCO.NS", name: "Hindalco" },
+      { sym: "HINDUNILVR.NS", name: "HUL" },
+      { sym: "INDUSINDBK.NS", name: "IndusInd Bank" },
+      { sym: "JSWSTEEL.NS", name: "JSW Steel" },
+      { sym: "NESTLEIND.NS", name: "Nestle India" },
+      { sym: "NTPC.NS", name: "NTPC" },
+      { sym: "ONGC.NS", name: "ONGC" },
+      { sym: "POWERGRID.NS", name: "Power Grid" },
+      { sym: "TATACONSUM.NS", name: "Tata Consumer" },
+      { sym: "TECHM.NS", name: "Tech Mahindra" },
+      { sym: "TITAN.NS", name: "Titan" },
+      { sym: "ULTRACEMCO.NS", name: "UltraTech Cement" },
+      { sym: "UPL.NS", name: "UPL" },
+      { sym: "ADANIPORTS.NS", name: "Adani Ports" },
+      { sym: "APOLLOHOSP.NS", name: "Apollo Hospitals" },
+      { sym: "BPCL.NS", name: "BPCL" },
+      { sym: "SBILIFE.NS", name: "SBI Life" },
+      { sym: "HDFCLIFE.NS", name: "HDFC Life" },
+      { sym: "TRENT.NS", name: "Trent" },
+      { sym: "SHRIRAMFIN.NS", name: "Shriram Finance" },
+      { sym: "BAJAJ-AUTO.NS", name: "Bajaj Auto" },
     ];
 
-    const results = await Promise.allSettled(stocks.map(s => fetchYahooRaw(s.sym)));
-    let report = "\n📈 TOP 20 NSE STOCKS (Real-Time):\n";
-    let hasData = false;
+    // Fetch in batches to avoid overwhelming Yahoo Finance
+    const BATCH_SIZE = 15;
+    const allResults: (typeof stocks[0] & { data: NonNullable<Awaited<ReturnType<typeof fetchYahooRaw>>> })[] = [];
 
-    results.forEach((r, i) => {
-      if (r.status === "fulfilled" && r.value) {
-        const d = r.value;
-        hasData = true;
-        report += `   ${stocks[i].name.padEnd(15)} ₹${d.price.toFixed(2).padStart(10)} ${d.chg >= 0 ? "+" : ""}${d.pct.toFixed(2).padStart(7)}%  H:${d.high.toFixed(2)} L:${d.low.toFixed(2)}  Vol:${formatVol(d.vol)}\n`;
-      }
+    for (let i = 0; i < stocks.length; i += BATCH_SIZE) {
+      const batch = stocks.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(s => withTimeout(fetchYahooRaw(s.sym), 8000, null))
+      );
+      results.forEach((r, idx) => {
+        if (r.status === "fulfilled" && r.value) {
+          allResults.push({ ...batch[idx], data: r.value });
+        }
+      });
+    }
+
+    if (allResults.length === 0) return "";
+
+    let report = `\n📈 TOP NSE STOCKS — ${allResults.length} stocks (Real-Time):\n`;
+    allResults.forEach(({ name, data: d }) => {
+      report += `   ${name.padEnd(18)} ₹${d.price.toFixed(2).padStart(10)} ${d.chg >= 0 ? "+" : ""}${d.pct.toFixed(2).padStart(7)}%  H:${d.high.toFixed(2)} L:${d.low.toFixed(2)}  Vol:${formatVol(d.vol)}\n`;
     });
 
-    return hasData ? report : "";
+    return report;
   } catch { return ""; }
 }
 
@@ -920,12 +1287,13 @@ serve(async (req) => {
     // ── User's Delta portfolio passed from frontend ──
     const deltaPortfolio = typeof rawDeltaPortfolio === "string" ? rawDeltaPortfolio : "";
 
-    // Fetch ALL live data in parallel for maximum context (18 sources)
+    // Fetch ALL live data in parallel for maximum context (19 sources + dynamic stocks)
     const [
       nseData, extIndices, topStocks,
       usMarkets, cryptoData, forexData, commodityData, treasuryData, sgxData,
       fiiDiiData, vixData, newsData, globalData, redditData,
       cryptoFearGreed, cryptoGlobal, trendingCrypto, usVix,
+      dynamicStocks,
     ] = await Promise.allSettled([
       fetchNSEData(),
       fetchExtendedIndices(),
@@ -945,6 +1313,7 @@ serve(async (req) => {
       fetchCryptoGlobalStats(),
       fetchTrendingCrypto(),
       fetchUSVIX(),
+      fetchDynamicStocks(messages),
     ]);
 
     const val = (r: PromiseSettledResult<string>) => r.status === "fulfilled" ? r.value : "";
@@ -967,6 +1336,7 @@ serve(async (req) => {
     const liveCryptoGlobal = val(cryptoGlobal);
     const liveTrendingCrypto = val(trendingCrypto);
     const liveUSVIX = val(usVix);
+    const liveDynamicStocks = val(dynamicStocks);
 
     const liveContext = `
 ${"═".repeat(60)}
@@ -981,7 +1351,7 @@ ${"═".repeat(60)}
 5. The data is a snapshot — it does NOT tell you direction. A stock at ₹100 could go to ₹90 or ₹110. Do not assume continuation.
 6. Maintain NEUTRAL tone. Present what the data shows, not what you think the user wants to hear.
 
-${liveNSE}${liveExtIdx}${liveStocks}${liveSGX}${liveFIIDII}${liveVIX}${liveUS}${liveUSVIX}${liveCrypto}${liveCryptoGlobal}${liveCryptoFG}${liveTrendingCrypto}${liveForex}${liveCommodity}${liveTreasury}${liveNews}${liveGlobal}${liveReddit}${deltaPortfolio ? `\n📋 USER'S LIVE DELTA EXCHANGE PORTFOLIO:\n${deltaPortfolio}\n` : ""}
+${liveNSE}${liveExtIdx}${liveStocks}${liveDynamicStocks}${liveSGX}${liveFIIDII}${liveVIX}${liveUS}${liveUSVIX}${liveCrypto}${liveCryptoGlobal}${liveCryptoFG}${liveTrendingCrypto}${liveForex}${liveCommodity}${liveTreasury}${liveNews}${liveGlobal}${liveReddit}${deltaPortfolio ? `\n📋 USER'S LIVE DELTA EXCHANGE PORTFOLIO:\n${deltaPortfolio}\n` : ""}
 ${"═".repeat(60)}
 END OF LIVE DATA — Every price, %, and figure above is verified real-time data.
 Base your entire analysis on this data. Do not contradict it.
@@ -997,7 +1367,7 @@ ${"═".repeat(60)}`;
       console.log(`Trimmed conversation history to last ${MAX_HISTORY} messages (was ${messages.length + MAX_HISTORY - MAX_HISTORY})`);
     }
 
-    console.log(`Context size: ${liveContext.length} chars | NSE:${liveNSE.length} Stocks:${liveStocks.length} US:${liveUS.length} Crypto:${liveCrypto.length}+${liveCryptoGlobal.length}+${liveCryptoFG.length} Forex:${liveForex.length} Commodity:${liveCommodity.length} FII:${liveFIIDII.length} VIX:${liveVIX.length}+${liveUSVIX.length} News:${liveNews.length} Sources:18`);
+    console.log(`Context size: ${liveContext.length} chars | NSE:${liveNSE.length} Stocks:${liveStocks.length} Dynamic:${liveDynamicStocks.length} US:${liveUS.length} Crypto:${liveCrypto.length}+${liveCryptoGlobal.length}+${liveCryptoFG.length} Forex:${liveForex.length} Commodity:${liveCommodity.length} FII:${liveFIIDII.length} VIX:${liveVIX.length}+${liveUSVIX.length} News:${liveNews.length} Sources:19`);
 
     // ═══════════════════════════════════════════
     // MULTI-PROVIDER AI GATEWAY (auto-detect available API key)

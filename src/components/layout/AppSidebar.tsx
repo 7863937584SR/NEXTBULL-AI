@@ -7,6 +7,7 @@ import {
   BarChart3,
   BookOpen,
   Calendar,
+  Shield,
   Map,
   FileBarChart,
   Info,
@@ -20,12 +21,14 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NextBullLogo } from '@/components/NextBullLogo';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { name: 'MARKETS', path: '/markets', icon: Globe, section: 'MARKET DATA', shortcut: 'MKTV' },
   { name: 'CURRENCY', path: '/currency', icon: DollarSign, section: 'MARKET DATA', shortcut: 'CRNC' },
   { name: 'ECONOMIC', path: '/economic', icon: TrendingUp, section: 'MARKET DATA', shortcut: 'ECO' },
   { name: 'RESEARCH', path: '/research', icon: FileText, section: 'ANALYTICS', shortcut: 'RSCH' },
+  { name: 'RESEARCH ADMIN', path: '/research-admin', icon: Shield, section: 'ANALYTICS', shortcut: 'RADM', adminOnly: true },
   { name: 'NEWS', path: '/news', icon: Newspaper, section: 'ANALYTICS', shortcut: 'NEWS' },
   { name: 'SENTIMENT', path: '/sentimental', icon: BarChart3, section: 'ANALYTICS', shortcut: 'SENT' },
   { name: 'EVENTS', path: '/events', icon: Calendar, section: 'TOOLS', shortcut: 'EVNT' },
@@ -42,10 +45,14 @@ interface AppSidebarProps {
 }
 
 export const AppSidebar = ({ isOpen, onClose }: AppSidebarProps) => {
+  const { isAdmin } = useAuth();
   const location = useLocation();
   const sections = ['MARKET DATA', 'ANALYTICS', 'TOOLS', 'SYSTEM'];
 
   const renderItem = (item: typeof navItems[0]) => {
+    if (item.adminOnly && !isAdmin) {
+      return null;
+    }
     const isActive = location.pathname === item.path;
     const Icon = item.icon;
 

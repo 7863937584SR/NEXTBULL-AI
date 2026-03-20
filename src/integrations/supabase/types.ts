@@ -142,6 +142,59 @@ export type Database = {
         }
         Relationships: []
       }
+      research_posts: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string
+          featured: boolean
+          id: string
+          image_url: string | null
+          read_time: string
+          source: string
+          tag: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          featured?: boolean
+          id?: string
+          image_url?: string | null
+          read_time: string
+          source: string
+          tag: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          featured?: boolean
+          id?: string
+          image_url?: string | null
+          read_time?: string
+          source?: string
+          tag?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_posts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_reports: {
         Row: {
           id: string
@@ -172,6 +225,44 @@ export type Database = {
             referencedRelation: "users"
             referencedColumns: ["id"]
           }
+        ]
+      }
+      research_comments: {
+        Row: {
+          id: string
+          post_id: string
+          user_id: string
+          user_email: string
+          user_name: string
+          content: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          user_id: string
+          user_email: string
+          user_name?: string
+          content: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          user_id?: string
+          user_email?: string
+          user_name?: string
+          content?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "research_posts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       trade_journal: {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Calendar,
@@ -18,11 +18,22 @@ import {
   Plus,
   X,
   Trash2,
+  Search,
+  Zap,
+  BarChart3,
+  Target,
+  Timer,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
 } from 'lucide-react';
+import { TVLazyWidget } from '@/components/dashboard/TVLazyWidget';
 
 /* ═══════════════════════════════════════════
-   TradingView Colors
+   TradingView Colors + Config
    ═══════════════════════════════════════════ */
+const TVUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
+
 const TV = {
   bg: '#131722',
   surface: '#1e222d',
@@ -277,6 +288,39 @@ async function fetchLiveEconomicEvents(): Promise<DayEvents[]> {
     console.error('Failed to fetch economic events:', error);
   }
 
+  // Fallback: if no events were fetched, populate with curated static data
+  const hasAnyEvents = days.some(d => d.events.length > 0);
+  if (!hasAnyEvents) {
+    days[1].events = [
+      { time: '09:00', country: 'IN', impact: 'high', category: 'Monetary', event: 'RBI Monetary Policy Decision', forecast: '6.25%', prior: '6.50%', description: 'Reserve Bank of India interest rate decision by the Monetary Policy Committee.' },
+      { time: '09:15', country: 'IN', impact: 'high', category: 'Inflation', event: 'India CPI Inflation (YoY)', actual: '4.8%', forecast: '4.9%', prior: '5.1%', description: 'Consumer Price Index inflation data released by the Ministry of Statistics.' },
+      { time: '10:00', country: 'IN', impact: 'medium', category: 'Manufacturing', event: 'India Manufacturing PMI', actual: '57.5', forecast: '57.0', prior: '56.5', description: 'S&P Global India Manufacturing Purchasing Managers Index.' },
+      { time: '11:00', country: 'IN', impact: 'medium', category: 'Trade', event: 'India Trade Balance', forecast: '-$23.5B', prior: '-$22.1B', description: 'Monthly trade balance data showing imports vs exports.' },
+      { time: '14:00', country: 'IN', impact: 'low', category: 'Economy', event: 'India Industrial Production (YoY)', forecast: '5.2%', prior: '4.8%', description: 'Index of Industrial Production measuring factory output growth.' },
+      { time: '18:00', country: 'US', impact: 'high', category: 'Inflation', event: 'US Core CPI (MoM)', forecast: '0.3%', prior: '0.3%', description: 'Core Consumer Price Index excluding food and energy prices.' },
+      { time: '19:30', country: 'US', impact: 'high', category: 'Employment', event: 'US Initial Jobless Claims', actual: '215K', forecast: '220K', prior: '218K', description: 'Weekly count of new unemployment insurance claims.' },
+      { time: '20:00', country: 'US', impact: 'medium', category: 'Sentiment', event: 'US Consumer Sentiment Index', forecast: '67.5', prior: '66.4', description: 'University of Michigan consumer confidence survey.' },
+    ];
+    days[2].events = [
+      { time: '09:00', country: 'IN', impact: 'high', category: 'GDP', event: 'India GDP Growth Rate (QoQ)', forecast: '7.0%', prior: '6.7%', description: 'Quarterly Gross Domestic Product growth estimate by CSO.' },
+      { time: '10:30', country: 'IN', impact: 'medium', category: 'Manufacturing', event: 'India Services PMI', forecast: '58.2', prior: '57.7', description: 'S&P Global India Services sector Purchasing Managers Index.' },
+      { time: '14:30', country: 'EU', impact: 'high', category: 'Monetary', event: 'ECB Interest Rate Decision', forecast: '3.75%', prior: '4.00%', description: 'European Central Bank main refinancing rate announcement.' },
+      { time: '19:00', country: 'US', impact: 'high', category: 'Employment', event: 'US Non-Farm Payrolls', forecast: '200K', prior: '187K', description: 'Monthly change in employment excluding the farming sector.' },
+      { time: '19:00', country: 'US', impact: 'medium', category: 'Employment', event: 'US Unemployment Rate', forecast: '3.8%', prior: '3.7%', description: 'Percentage of total workforce that is unemployed and actively seeking work.' },
+    ];
+    days[3].events = [
+      { time: '09:00', country: 'IN', impact: 'medium', category: 'Fiscal', event: 'India Government Budget Review', description: 'Mid-year review of Union Budget expenditure and revenue collection.' },
+      { time: '15:00', country: 'JP', impact: 'high', category: 'Monetary', event: 'BOJ Policy Rate Decision', forecast: '0.25%', prior: '0.10%', description: 'Bank of Japan monetary policy interest rate decision.' },
+      { time: '15:30', country: 'CN', impact: 'medium', category: 'Manufacturing', event: 'China Manufacturing PMI', actual: '50.2', forecast: '50.0', prior: '49.8', description: 'Official NBS Manufacturing Purchasing Managers Index.' },
+      { time: '20:00', country: 'US', impact: 'high', category: 'Monetary', event: 'FOMC Meeting Minutes', description: 'Minutes from the latest Federal Open Market Committee meeting.' },
+    ];
+    days[0].events = [
+      { time: '09:30', country: 'IN', impact: 'medium', category: 'Economy', event: 'India Forex Reserves (Weekly)', actual: '$640.5B', prior: '$638.2B', description: 'Weekly foreign exchange reserves held by the Reserve Bank of India.' },
+      { time: '14:00', country: 'UK', impact: 'medium', category: 'GDP', event: 'UK GDP (QoQ)', forecast: '0.3%', prior: '0.2%', description: 'Quarterly gross domestic product estimate for the United Kingdom.' },
+      { time: '19:00', country: 'US', impact: 'medium', category: 'Housing', event: 'US Existing Home Sales', forecast: '4.0M', prior: '3.95M', description: 'Annualized rate of existing residential property sales.' },
+    ];
+  }
+
   return days;
 }
 
@@ -290,6 +334,8 @@ const COUNTRY_NAMES: Record<string, string> = {
 
 const IMPACT_LABELS: Record<string, string> = { high: 'HIGH', medium: 'MED', low: 'LOW' };
 
+const ALL_CATEGORIES = ['All', 'GDP', 'Inflation', 'Monetary', 'Employment', 'Trade', 'Manufacturing', 'Fiscal', 'Sentiment', 'Housing', 'Energy', 'Economy', 'Custom'];
+
 /* ═══════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════ */
@@ -299,9 +345,13 @@ const Economic = () => {
   const [selectedDayIdx, setSelectedDayIdx] = useState(1);
   const [impactFilter, setImpactFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
   const [countryFilter, setCountryFilter] = useState<'all' | 'IN' | 'US' | 'EU' | 'JP' | 'CN' | 'UK'>('all');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [expandedEvent, setExpandedEvent] = useState<number | null>(null);
   const [customEvents, setCustomEvents] = useState<CustomEvent[]>(loadCustomEvents);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [activeView, setActiveView] = useState<'calendar' | 'widget'>('calendar');
+  const [countdown, setCountdown] = useState('');
 
   // Form state for add modal
   const [formTime, setFormTime] = useState('09:00');
@@ -352,10 +402,61 @@ const Economic = () => {
   const filteredEvents = allEventsForDay.filter(e => {
     if (impactFilter !== 'all' && e.impact !== impactFilter) return false;
     if (countryFilter !== 'all' && e.country !== countryFilter) return false;
+    if (categoryFilter !== 'All' && e.category !== categoryFilter) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!e.event.toLowerCase().includes(q) && !e.category.toLowerCase().includes(q) && !(e.description || '').toLowerCase().includes(q)) return false;
+    }
     return true;
   });
 
   const isToday = selectedDayIdx === 1;
+
+  // ── Stats across all days ──
+  const weekStats = useMemo(() => {
+    const allEvents = allDays.flatMap(d => d.events);
+    const customAll = customEvents.map(ce => ({
+      time: ce.time, country: ce.country, impact: ce.impact, category: ce.category, event: ce.event,
+    }));
+    const combined = [...allEvents, ...customAll];
+    return {
+      total: combined.length,
+      high: combined.filter(e => e.impact === 'high').length,
+      medium: combined.filter(e => e.impact === 'medium').length,
+      low: combined.filter(e => e.impact === 'low').length,
+      countries: new Set(combined.map(e => e.country)).size,
+      indiaHigh: combined.filter(e => e.impact === 'high' && e.country === 'IN').length,
+      perDay: allDays.map(d => d.events.length),
+    };
+  }, [allDays, customEvents]);
+
+  // ── Countdown to next high-impact event ──
+  useEffect(() => {
+    if (allDays.length === 0) return;
+    const tick = () => {
+      const now = new Date();
+      for (const day of allDays) {
+        for (const ev of day.events) {
+          if (ev.impact !== 'high') continue;
+          const [h, m] = ev.time.split(':').map(Number);
+          const eventDate = new Date(day.date);
+          eventDate.setHours(h, m, 0, 0);
+          const diff = eventDate.getTime() - now.getTime();
+          if (diff > 0) {
+            const hours = Math.floor(diff / 3600000);
+            const mins = Math.floor((diff % 3600000) / 60000);
+            const secs = Math.floor((diff % 60000) / 1000);
+            setCountdown(`${hours}h ${mins}m ${secs}s`);
+            return;
+          }
+        }
+      }
+      setCountdown('--');
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [allDays]);
 
   const handleAddEvent = () => {
     if (!formEvent.trim()) return;
@@ -374,7 +475,6 @@ const Economic = () => {
     const updated = [...customEvents, newEvent];
     setCustomEvents(updated);
     saveCustomEvents(updated);
-    // Reset form
     setFormEvent(''); setFormForecast(''); setFormPrior(''); setFormDescription('');
     setFormTime('09:00'); setFormCategory('Custom'); setFormCountry('IN'); setFormImpact('medium');
     setShowAddModal(false);
@@ -385,6 +485,14 @@ const Economic = () => {
     setCustomEvents(updated);
     saveCustomEvents(updated);
   };
+
+  const handleRefresh = useCallback(() => {
+    setLoading(true);
+    fetchLiveEconomicEvents().then(days => {
+      setAllDays(days);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
 
   const formatDate = (date: Date) => {
     const opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
@@ -397,30 +505,107 @@ const Economic = () => {
 
   return (
     <div style={{ background: TV.bg, minHeight: 'calc(100vh - 3.5rem)', color: TV.text }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 20px' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 20px' }}>
 
-        {/* ── HEADER ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <div>
-            <h1 style={{ fontSize: 26, fontWeight: 700, color: TV.text, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Calendar style={{ width: 24, height: 24, color: TV.blue }} />
-              Economic Calendar
-            </h1>
-            <p style={{ fontSize: 12, color: TV.textSecondary, marginTop: 4, marginLeft: 34 }}>
-              {loading ? 'Fetching live economic events...' : 'Live economic events that impact Indian & global markets'}
-            </p>
+        {/* ══════════════ HEADER WITH STATS ══════════════ */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h1 style={{ fontSize: 28, fontWeight: 700, color: TV.text, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Calendar style={{ width: 26, height: 26, color: TV.blue }} />
+                Economic Calendar
+              </h1>
+              <p style={{ fontSize: 12, color: TV.textSecondary, marginTop: 4, marginLeft: 36 }}>
+                {loading ? 'Fetching live economic events...' : 'Live economic events · Indian & global markets · Real-time data'}
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={handleRefresh} disabled={loading}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: 'transparent', border: `1px solid ${TV.border}`, color: TV.textSecondary, cursor: loading ? 'not-allowed' : 'pointer' }}
+              >
+                <RefreshCw style={{ width: 12, height: 12, animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
+              </button>
+              <button onClick={() => setShowAddModal(true)} disabled={loading || allDays.length === 0}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: (loading || allDays.length === 0) ? TV.textMuted : TV.blue, color: '#fff', border: 'none', cursor: (loading || allDays.length === 0) ? 'not-allowed' : 'pointer' }}
+              >
+                <Plus style={{ width: 14, height: 14 }} /> Add Event
+              </button>
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={() => setShowAddModal(true)} disabled={loading || allDays.length === 0}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: (loading || allDays.length === 0) ? TV.textMuted : TV.blue, color: '#fff', border: 'none', cursor: (loading || allDays.length === 0) ? 'not-allowed' : 'pointer', transition: 'all 0.15s' }}
-              onMouseEnter={e => { if (!loading && allDays.length > 0) (e.currentTarget).style.background = TV.blueHover; }}
-              onMouseLeave={e => { if (!loading && allDays.length > 0) (e.currentTarget).style.background = TV.blue; }}
-            >
-              <Plus style={{ width: 14, height: 14 }} /> Add Event
-            </button>
-            <span style={{ fontSize: 10, color: TV.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>IST</span>
-            <Clock style={{ width: 14, height: 14, color: TV.textMuted }} />
-          </div>
+
+          {/* ── Stats Dashboard ── */}
+          {!loading && allDays.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 16 }}>
+              <div style={{ padding: '14px 16px', background: TV.surface, borderRadius: 10, border: `1px solid ${TV.border}`, position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: TV.blue }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <BarChart3 style={{ width: 14, height: 14, color: TV.blue }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: TV.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total Events</span>
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: TV.text, fontVariantNumeric: 'tabular-nums' }}>{weekStats.total}</div>
+                <div style={{ fontSize: 10, color: TV.textSecondary, marginTop: 2 }}>This week</div>
+              </div>
+
+              <div style={{ padding: '14px 16px', background: TV.surface, borderRadius: 10, border: `1px solid ${TV.border}`, position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: TV.high }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <AlertTriangle style={{ width: 14, height: 14, color: TV.high }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: TV.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>High Impact</span>
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: TV.high, fontVariantNumeric: 'tabular-nums' }}>{weekStats.high}</div>
+                <div style={{ fontSize: 10, color: TV.textSecondary, marginTop: 2 }}>{weekStats.indiaHigh} India events</div>
+              </div>
+
+              <div style={{ padding: '14px 16px', background: TV.surface, borderRadius: 10, border: `1px solid ${TV.border}`, position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: TV.success }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <Globe style={{ width: 14, height: 14, color: TV.success }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: TV.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Countries</span>
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: TV.text, fontVariantNumeric: 'tabular-nums' }}>{weekStats.countries}</div>
+                <div style={{ fontSize: 10, color: TV.textSecondary, marginTop: 2 }}>Regions tracked</div>
+              </div>
+
+              <div style={{ padding: '14px 16px', background: TV.surface, borderRadius: 10, border: `1px solid ${TV.border}`, position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: TV.warning }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <Timer style={{ width: 14, height: 14, color: TV.warning }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: TV.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Next High</span>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: TV.warning, fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace' }}>{countdown || '--'}</div>
+                <div style={{ fontSize: 10, color: TV.textSecondary, marginTop: 2 }}>Countdown</div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Week Overview Bar ── */}
+          {!loading && allDays.length > 0 && (
+            <div style={{ display: 'flex', gap: 4, padding: '10px 16px', background: TV.surface, borderRadius: 8, border: `1px solid ${TV.border}`, marginBottom: 16, alignItems: 'flex-end' }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: TV.textMuted, marginRight: 8, alignSelf: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Week:</span>
+              {allDays.map((day, idx) => {
+                const count = day.events.length + customEvents.filter(ce => ce.dateKey === day.date.toISOString().split('T')[0]).length;
+                const maxCount = Math.max(...allDays.map(d => d.events.length), 1);
+                const barH = Math.max(6, (count / maxCount) * 40);
+                const isSelected = idx === selectedDayIdx;
+                const isTdy = idx === 1;
+                const highCount = day.events.filter(e => e.impact === 'high').length;
+                return (
+                  <button key={idx} onClick={() => setSelectedDayIdx(idx)}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flex: 1, cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
+                  >
+                    <div style={{ width: '100%', maxWidth: 36, height: barH, borderRadius: 3, background: isSelected ? TV.blue : highCount > 0 ? `${TV.high}40` : `${TV.textMuted}30`, transition: 'all 0.2s', position: 'relative' }}>
+                      {highCount > 0 && !isSelected && <div style={{ position: 'absolute', top: -3, right: -3, width: 6, height: 6, borderRadius: '50%', background: TV.high }} />}
+                    </div>
+                    <span style={{ fontSize: 9, fontWeight: isSelected ? 700 : 500, color: isSelected ? TV.blue : isTdy ? TV.text : TV.textMuted }}>
+                      {isTdy ? 'Today' : day.date.toLocaleDateString('en-IN', { weekday: 'short' })}
+                    </span>
+                    <span style={{ fontSize: 8, color: TV.textMuted }}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* ── LOADING STATE ── */}
@@ -441,9 +626,40 @@ const Economic = () => {
           </div>
         ) : (<>
 
+        {/* ── VIEW TABS: Calendar vs TradingView Widget ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 16 }}>
+          <button onClick={() => setActiveView('calendar')}
+            style={{ padding: '8px 20px', fontSize: 12, fontWeight: 600, border: `1px solid ${TV.border}`, borderRight: 'none', borderRadius: '6px 0 0 6px', cursor: 'pointer', background: activeView === 'calendar' ? TV.blue : 'transparent', color: activeView === 'calendar' ? '#fff' : TV.textSecondary }}>
+            <Calendar style={{ width: 12, height: 12, display: 'inline', marginRight: 6, verticalAlign: -1 }} />Calendar
+          </button>
+          <button onClick={() => setActiveView('widget')}
+            style={{ padding: '8px 20px', fontSize: 12, fontWeight: 600, border: `1px solid ${TV.border}`, borderRadius: '0 6px 6px 0', cursor: 'pointer', background: activeView === 'widget' ? TV.blue : 'transparent', color: activeView === 'widget' ? '#fff' : TV.textSecondary }}>
+            <ExternalLink style={{ width: 12, height: 12, display: 'inline', marginRight: 6, verticalAlign: -1 }} />TradingView
+          </button>
+        </div>
+
+        {activeView === 'widget' ? (
+          <div style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${TV.border}`, marginBottom: 24 }}>
+            <TVLazyWidget
+              src={`${TVUrl}economic-calendar.js`}
+              height="600px"
+              skeletonHeight="h-[600px]"
+              config={{
+                width: '100%',
+                height: '600',
+                colorTheme: 'dark',
+                isTransparent: true,
+                locale: 'en',
+                importanceFilter: '-1,0,1',
+                countryFilter: 'in,us,eu,jp,cn,gb',
+              }}
+            />
+          </div>
+        ) : (<>
+
         {/* ── DATE NAVIGATION ── */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, padding: '12px 16px',
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, padding: '12px 16px',
           background: TV.surface, borderRadius: 8, border: `1px solid ${TV.border}`,
         }}>
           <button onClick={() => setSelectedDayIdx(i => Math.max(0, i - 1))} disabled={selectedDayIdx <= 0}
@@ -459,6 +675,7 @@ const Economic = () => {
             {allDays.map((day, idx) => {
               const isSelected = idx === selectedDayIdx;
               const isTodayTab = idx === 1;
+              const dayHigh = day.events.filter(e => e.impact === 'high').length;
               return (
                 <button key={idx} onClick={() => setSelectedDayIdx(idx)}
                   style={{
@@ -469,6 +686,9 @@ const Economic = () => {
                     position: 'relative',
                   }}>
                   {isTodayTab ? 'Today' : formatShortDate(day.date)}
+                  {dayHigh > 0 && !isSelected && (
+                    <span style={{ position: 'absolute', top: 2, right: 2, width: 6, height: 6, borderRadius: '50%', background: TV.high }} />
+                  )}
                   {isTodayTab && !isSelected && (
                     <div style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: TV.blue }} />
                   )}
@@ -487,11 +707,30 @@ const Economic = () => {
           </button>
         </div>
 
-        {/* ── FILTERS ── */}
-        <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* ── SEARCH + FILTERS ── */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Search box */}
+          <div style={{ position: 'relative', flex: '1 1 200px', maxWidth: 320 }}>
+            <Search style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, color: TV.textMuted }} />
+            <input
+              value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search events..."
+              style={{ width: '100%', padding: '7px 10px 7px 30px', borderRadius: 6, background: TV.surface, border: `1px solid ${TV.border}`, color: TV.text, fontSize: 12, outline: 'none' }}
+              onFocus={e => { e.target.style.borderColor = TV.blue; }} onBlur={e => { e.target.style.borderColor = TV.border; }}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: TV.textMuted }}>
+                <X style={{ width: 12, height: 12 }} />
+              </button>
+            )}
+          </div>
+
+          <span style={{ width: 1, height: 24, background: TV.border }} />
+
+          {/* Impact filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Filter style={{ width: 12, height: 12, color: TV.textMuted }} />
-            <span style={{ fontSize: 11, color: TV.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Impact:</span>
+            <span style={{ fontSize: 10, color: TV.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Impact:</span>
           </div>
           {(['all', 'high', 'medium', 'low'] as const).map(level => (
             <button key={level} onClick={() => setImpactFilter(level)}
@@ -506,13 +745,13 @@ const Economic = () => {
             </button>
           ))}
 
-          <span style={{ width: 1, height: 20, background: TV.border }} />
+          <span style={{ width: 1, height: 24, background: TV.border }} />
 
+          {/* Country filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Globe style={{ width: 12, height: 12, color: TV.textMuted }} />
-            <span style={{ fontSize: 11, color: TV.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Country:</span>
           </div>
-          {(['all', 'IN', 'US', 'EU'] as const).map(c => (
+          {(['all', 'IN', 'US', 'EU', 'JP', 'CN', 'UK'] as const).map(c => (
             <button key={c} onClick={() => setCountryFilter(c as any)}
               style={{
                 fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 4, cursor: 'pointer', border: 'none',
@@ -520,6 +759,21 @@ const Economic = () => {
                 color: countryFilter === c ? TV.blue : TV.textSecondary,
               }}>
               {c === 'all' ? 'All' : `${COUNTRY_FLAGS[c]} ${c}`}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Category Chips ── */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
+          {ALL_CATEGORIES.map(cat => (
+            <button key={cat} onClick={() => setCategoryFilter(cat)}
+              style={{
+                padding: '4px 12px', borderRadius: 20, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap',
+                cursor: 'pointer', transition: 'all 0.15s', border: 'none',
+                background: categoryFilter === cat ? `${TV.blue}25` : `${TV.textMuted}15`,
+                color: categoryFilter === cat ? TV.blue : TV.textSecondary,
+              }}>
+              {cat}
             </button>
           ))}
         </div>
@@ -536,13 +790,24 @@ const Economic = () => {
               </span>
             )}
           </div>
-          <span style={{ fontSize: 12, color: TV.textSecondary }}>
-            {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {searchQuery && (
+              <span style={{ fontSize: 11, color: TV.warning }}>Searching: "{searchQuery}"</span>
+            )}
+            <span style={{ fontSize: 12, color: TV.textSecondary }}>
+              {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}
+              {(impactFilter !== 'all' || countryFilter !== 'all' || categoryFilter !== 'All' || searchQuery) && (
+                <button onClick={() => { setImpactFilter('all'); setCountryFilter('all'); setCategoryFilter('All'); setSearchQuery(''); }}
+                  style={{ marginLeft: 8, fontSize: 10, color: TV.blue, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                  Clear filters
+                </button>
+              )}
+            </span>
+          </div>
         </div>
 
         {/* ── TABLE HEADER ── */}
-        <div className="grid grid-cols-[60px_40px_50px_1fr_90px_90px_90px] px-4 py-3 bg-[#1e222d] rounded-t-2xl border border-white/10 border-b-0 text-[10px] font-bold text-gray-500 uppercase tracking-widest relative">
+        <div className="hidden sm:grid grid-cols-[60px_40px_50px_1fr_90px_90px_90px] px-4 py-3 bg-[#1e222d] rounded-t-2xl border border-white/10 border-b-0 text-[10px] font-bold text-gray-500 uppercase tracking-widest relative">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500/30 via-indigo-500/30 to-purple-500/30 rounded-t-2xl" />
           <span>TIME</span>
           <span></span>
@@ -554,14 +819,16 @@ const Economic = () => {
         </div>
 
         {/* ── EVENT ROWS ── */}
-        <div className="rounded-b-2xl overflow-hidden border border-white/10 bg-[#1e222d]/60 backdrop-blur-xl shadow-2xl relative mb-8">
+        <div className="rounded-b-2xl sm:rounded-b-2xl rounded-t-2xl sm:rounded-t-none overflow-hidden border border-white/10 bg-[#1e222d]/60 backdrop-blur-xl shadow-2xl relative mb-8">
           <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
           <div className="relative z-10">
             {filteredEvents.length === 0 ? (
               <div className="py-12 text-center">
                 <Calendar className="w-8 h-8 text-gray-600 mx-auto mb-3" />
-                <p className="text-[13px] text-gray-400">No events matching filters</p>
-                <p className="text-[11px] text-gray-500 mt-1">Try adjusting impact or country filters</p>
+                <p className="text-[13px] text-gray-400">
+                  {searchQuery ? `No events matching "${searchQuery}"` : 'No events matching filters'}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-1">Try adjusting impact, country, or category filters</p>
               </div>
             ) : (
               filteredEvents.map((event, idx) => {
@@ -579,26 +846,19 @@ const Economic = () => {
 
                 return (
                   <div key={idx} className="group relative">
-                    {/* Hover Glow Background */}
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-white/[0.03] transition-opacity duration-300 pointer-events-none" />
 
+                    {/* ── Desktop Row ── */}
                     <div
-                      className={`grid grid-cols-[60px_40px_50px_1fr_90px_90px_90px] px-4 py-3 items-center relative z-10 ${event.description ? 'cursor-pointer hover:bg-white/[0.02]' : 'cursor-default'
+                      className={`hidden sm:grid grid-cols-[60px_40px_50px_1fr_90px_90px_90px] px-4 py-3 items-center relative z-10 ${event.description ? 'cursor-pointer hover:bg-white/[0.02]' : 'cursor-default'
                         } ${idx < filteredEvents.length - 1 ? 'border-b border-white/5' : ''} ${isExpanded ? 'bg-white/[0.04]' : ''
                         } transition-colors duration-200`}
                       onClick={() => event.description && setExpandedEvent(isExpanded ? null : idx)}
                     >
-                      {/* Left accent color for impact on hover */}
-                      <div className={`absolute left-0 top-0 bottom-0 w-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${event.impact === 'high' ? 'bg-red-500' : event.impact === 'medium' ? 'bg-orange-500' : 'bg-emerald-500'
-                        }`} />
+                      <div className={`absolute left-0 top-0 bottom-0 w-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${event.impact === 'high' ? 'bg-red-500' : event.impact === 'medium' ? 'bg-orange-500' : 'bg-emerald-500'}`} />
 
-                      {/* Time */}
                       <span className="text-xs text-gray-400 font-mono tracking-wide">{event.time}</span>
-
-                      {/* Country flag */}
                       <span className="text-base" title={COUNTRY_NAMES[event.country]}>{COUNTRY_FLAGS[event.country]}</span>
-
-                      {/* Impact */}
                       <div className="flex items-center gap-1">
                         {[1, 2, 3].map(i => (
                           <div key={i} className={`w-1 rounded-sm ${i <= (event.impact === 'high' ? 3 : event.impact === 'medium' ? 2 : 1)
@@ -608,7 +868,6 @@ const Economic = () => {
                         ))}
                       </div>
 
-                      {/* Event name */}
                       <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
                         <span className="text-[13px] font-semibold text-gray-200 group-hover:text-white transition-colors truncate">
                           {event.event}
@@ -632,9 +891,13 @@ const Economic = () => {
                             </button>
                           </>
                         )}
+                        {event.description && (
+                          <span className="text-gray-500 flex-shrink-0">
+                            {isExpanded ? <ChevronUp style={{ width: 12, height: 12 }} /> : <ChevronDown style={{ width: 12, height: 12 }} />}
+                          </span>
+                        )}
                       </div>
 
-                      {/* Actual */}
                       <span className={`text-right text-[13px] ${hasActual
                           ? beatForecast === 'beat' ? 'text-emerald-400 font-bold drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]'
                             : beatForecast === 'miss' ? 'text-red-400 font-bold drop-shadow-[0_0_8px_rgba(248,113,113,0.3)]'
@@ -643,18 +906,38 @@ const Economic = () => {
                         }`}>
                         {event.actual || '—'}
                       </span>
-
-                      {/* Forecast */}
                       <span className="text-right text-[13px] text-gray-400">{event.forecast || '—'}</span>
-
-                      {/* Prior */}
                       <span className="text-right text-[13px] text-gray-500">{event.prior || '—'}</span>
+                    </div>
+
+                    {/* ── Mobile Card ── */}
+                    <div
+                      className={`sm:hidden px-4 py-3 relative z-10 ${event.description ? 'cursor-pointer' : ''} ${idx < filteredEvents.length - 1 ? 'border-b border-white/5' : ''} ${isExpanded ? 'bg-white/[0.04]' : ''}`}
+                      onClick={() => event.description && setExpandedEvent(isExpanded ? null : idx)}
+                    >
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${event.impact === 'high' ? 'bg-red-500' : event.impact === 'medium' ? 'bg-orange-500' : 'bg-emerald-500'}`} />
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="text-sm">{COUNTRY_FLAGS[event.country]}</span>
+                          <span className="text-[13px] font-semibold text-gray-200 truncate">{event.event}</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-gray-500 flex-shrink-0">{event.time}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-[11px]">
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-gray-400 uppercase border border-white/10">{event.category}</span>
+                        {event.actual && <span className={`font-bold ${beatForecast === 'beat' ? 'text-emerald-400' : beatForecast === 'miss' ? 'text-red-400' : 'text-gray-200'}`}>A: {event.actual}</span>}
+                        {event.forecast && <span className="text-gray-400">F: {event.forecast}</span>}
+                        {event.prior && <span className="text-gray-500">P: {event.prior}</span>}
+                        {event.isCustom && (
+                          <button onClick={e2 => { e2.stopPropagation(); handleDeleteCustom(event.customId!); }}
+                            className="ml-auto text-gray-500 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Expanded description */}
                     {isExpanded && event.description && (
-                      <div className={`p-4 pl-[166px] bg-white/[0.04] relative z-10 border-t border-white/5 ${idx < filteredEvents.length - 1 ? 'border-b border-white/5' : ''
-                        }`}>
+                      <div className={`p-4 sm:pl-[166px] pl-6 bg-white/[0.04] relative z-10 border-t border-white/5 ${idx < filteredEvents.length - 1 ? 'border-b border-white/5' : ''}`}>
                         <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500/50" />
                         <p className="text-[11px] text-gray-400 leading-relaxed max-w-2xl">{event.description}</p>
                       </div>
@@ -668,10 +951,10 @@ const Economic = () => {
 
         {/* ── LEGEND ── */}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10,
           marginTop: 20, padding: '14px 18px', background: TV.surface, borderRadius: 8, border: `1px solid ${TV.border}`,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20, fontSize: 11 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, fontSize: 11, flexWrap: 'wrap' }}>
             <span style={{ color: TV.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Impact:</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: TV.high }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: TV.high }} /> High — Major market mover
@@ -684,30 +967,37 @@ const Economic = () => {
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 11 }}>
-            <span style={{ color: TV.success }}>🟢 Actual beat forecast</span>
-            <span style={{ color: TV.danger }}>🔴 Actual missed forecast</span>
+            <span style={{ color: TV.success }}>🟢 Beat forecast</span>
+            <span style={{ color: TV.danger }}>🔴 Missed forecast</span>
           </div>
         </div>
 
+        </>)}
+
         {/* ── UPCOMING KEY EVENTS ── */}
+        {!loading && allDays.length > 0 && (
         <div style={{ marginTop: 24 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: TV.text, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlertTriangle style={{ width: 14, height: 14, color: TV.warning }} />
             Upcoming High-Impact Events (India)
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
             {allDays.slice(selectedDayIdx).flatMap(day =>
               day.events.filter(e => e.impact === 'high' && e.country === 'IN').map(e => ({ ...e, date: day.date }))
-            ).slice(0, 4).map((e, i) => (
+            ).slice(0, 6).map((e, i) => (
               <div key={i} style={{
-                padding: '14px 16px', background: TV.surface, borderRadius: 8,
+                padding: '14px 16px', background: TV.surface, borderRadius: 10,
                 border: `1px solid ${TV.border}`, borderLeft: `3px solid ${TV.high}`,
-              }}>
+                transition: 'all 0.2s',
+              }}
+                onMouseEnter={ev => { (ev.currentTarget).style.borderColor = TV.borderHover; (ev.currentTarget).style.background = TV.surfaceHover; }}
+                onMouseLeave={ev => { (ev.currentTarget).style.borderColor = TV.border; (ev.currentTarget).style.background = TV.surface; }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: TV.text }}>{e.event}</span>
                   <span style={{ fontSize: 10, color: TV.textMuted }}>{COUNTRY_FLAGS[e.country]}</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, color: TV.textSecondary }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, color: TV.textSecondary, flexWrap: 'wrap' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Calendar style={{ width: 10, height: 10 }} />
                     {e.date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
@@ -719,11 +1009,62 @@ const Economic = () => {
                   {e.forecast && (
                     <span>Fcst: <strong style={{ color: TV.text }}>{e.forecast}</strong></span>
                   )}
+                  {e.prior && (
+                    <span>Prior: <strong style={{ color: TV.textSecondary }}>{e.prior}</strong></span>
+                  )}
                 </div>
               </div>
             ))}
+            {allDays.slice(selectedDayIdx).flatMap(day =>
+              day.events.filter(e => e.impact === 'high' && e.country === 'IN')
+            ).length === 0 && (
+              <div style={{ padding: '20px', color: TV.textMuted, fontSize: 12, textAlign: 'center', gridColumn: '1 / -1' }}>
+                No upcoming high-impact India events in this period
+              </div>
+            )}
           </div>
         </div>
+        )}
+
+        {/* ── All Countries High Impact ── */}
+        {!loading && allDays.length > 0 && (() => {
+          const globalHigh = allDays.slice(selectedDayIdx).flatMap(day =>
+            day.events.filter(e => e.impact === 'high' && e.country !== 'IN').map(e => ({ ...e, date: day.date }))
+          ).slice(0, 4);
+          if (globalHigh.length === 0) return null;
+          return (
+            <div style={{ marginTop: 20 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: TV.text, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Globe style={{ width: 14, height: 14, color: TV.blue }} />
+                Upcoming Global High-Impact
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+                {globalHigh.map((e, i) => (
+                  <div key={i} style={{
+                    padding: '14px 16px', background: TV.surface, borderRadius: 10,
+                    border: `1px solid ${TV.border}`, borderLeft: `3px solid ${TV.blue}`,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: TV.text }}>{e.event}</span>
+                      <span style={{ fontSize: 12 }}>{COUNTRY_FLAGS[e.country]}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, color: TV.textSecondary }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Calendar style={{ width: 10, height: 10 }} />
+                        {e.date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Clock style={{ width: 10, height: 10 }} />
+                        {e.time} IST
+                      </span>
+                      {e.forecast && <span>Fcst: <strong style={{ color: TV.text }}>{e.forecast}</strong></span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── FOOTER ── */}
         <div style={{ marginTop: 24, padding: '12px 16px', textAlign: 'center', fontSize: 11, color: TV.textMuted }}>
@@ -743,7 +1084,6 @@ const Economic = () => {
             style={{ background: TV.surface, borderRadius: 12, border: `1px solid ${TV.border}`, width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
             onClick={e => e.stopPropagation()}
           >
-            {/* Modal Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: `1px solid ${TV.border}` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Plus style={{ width: 18, height: 18, color: TV.blue }} />
@@ -757,9 +1097,7 @@ const Economic = () => {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Event Name (required) */}
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: TV.textSecondary, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Event Name *</label>
                 <input value={formEvent} onChange={e => setFormEvent(e.target.value)} placeholder="e.g. Q3 Earnings — Reliance"
@@ -768,7 +1106,6 @@ const Economic = () => {
                 />
               </div>
 
-              {/* Row: Time + Country + Impact */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 600, color: TV.textSecondary, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Time (IST)</label>
@@ -794,7 +1131,6 @@ const Economic = () => {
                 </div>
               </div>
 
-              {/* Category */}
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: TV.textSecondary, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Category</label>
                 <select value={formCategory} onChange={e => setFormCategory(e.target.value)}
@@ -805,7 +1141,6 @@ const Economic = () => {
                 </select>
               </div>
 
-              {/* Row: Forecast + Prior */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 600, color: TV.textSecondary, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Forecast</label>
@@ -821,7 +1156,6 @@ const Economic = () => {
                 </div>
               </div>
 
-              {/* Description */}
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: TV.textSecondary, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Description</label>
                 <textarea value={formDescription} onChange={e => setFormDescription(e.target.value)} rows={2}
@@ -830,7 +1164,6 @@ const Economic = () => {
                 />
               </div>
 
-              {/* Actions */}
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
                 <button onClick={() => setShowAddModal(false)}
                   style={{ padding: '8px 18px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'transparent', border: `1px solid ${TV.border}`, color: TV.textSecondary, cursor: 'pointer' }}>

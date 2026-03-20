@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isAdmin: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -64,9 +65,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
   }, []);
 
+  const ADMIN_EMAILS = ['surjaroy513@gmail.com'];
+
+  const isAdmin = useMemo(() => {
+    const role = session?.user?.app_metadata?.role;
+    const email = session?.user?.email;
+    return role === 'admin' || (!!email && ADMIN_EMAILS.includes(email));
+  }, [session]);
+
   const value = useMemo(() => ({
-    user, session, loading, signUp, signIn, signOut
-  }), [user, session, loading, signUp, signIn, signOut]);
+    user, session, loading, isAdmin, signUp, signIn, signOut
+  }), [user, session, loading, isAdmin, signUp, signIn, signOut]);
 
   return (
     <AuthContext.Provider value={value}>

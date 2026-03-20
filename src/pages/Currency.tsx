@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Activity, Globe, TrendingUp, Calculator, BarChart3, Zap, Calendar, Clock, Signal, AlertTriangle, CheckCircle, Bell, Building, BarChart } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Activity, Globe, TrendingUp, Calculator, BarChart3, Zap, Clock, AlertTriangle, CheckCircle, BarChart, ArrowUp, ArrowDown, Minus, IndianRupee, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -9,26 +9,23 @@ import EnhancedCurrencyDashboard from '@/components/dashboard/EnhancedCurrencyDa
 import CurrencyConverter from '@/components/dashboard/CurrencyConverter';
 import { TVLazyWidget } from '@/components/dashboard/TVLazyWidget';
 import { useQuery } from '@tanstack/react-query';
-import { fetchForexRates, fetchDetailedForexRates } from '@/services/forexService';
+import { fetchDetailedForexRates } from '@/services/forexService';
 import { NextBullLogo } from '@/components/NextBullLogo';
 
 const TVUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
-// Real-time market data fetcher
-const fetchMarketStatus = async () => {
-  const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-  if (!response.ok) throw new Error('Failed to fetch market status');
-  const data = await response.json();
-  return {
-    isMarketOpen: true,
-    lastUpdated: new Date(data.date),
-    totalPairs: Object.keys(data.rates).length,
-    baseCurrency: data.base
-  };
-};
+interface VolatilityItem {
+  pair: string;
+  volatility: number;
+  trend: 'rising' | 'falling' | 'stable';
+  rate: number;
+  change: number;
+  changePct: number;
+  prevClose: number;
+}
 
-// Fetch real-time volatility data from live forex rates
-const fetchVolatilityData = async () => {
+// Fetch real-time volatility data from live forex rates — expanded pairs including INR
+const fetchVolatilityData = async (): Promise<VolatilityItem[]> => {
   const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
   if (!response.ok) throw new Error('Failed to fetch volatility data');
   const data = await response.json();
@@ -46,48 +43,86 @@ const fetchVolatilityData = async () => {
     }
   } catch {}
 
-  const pairs = [
+  const pairs: { from: string; to: string }[] = [
     { from: 'EUR', to: 'USD' },
     { from: 'GBP', to: 'USD' },
     { from: 'USD', to: 'JPY' },
     { from: 'USD', to: 'CHF' },
     { from: 'AUD', to: 'USD' },
     { from: 'USD', to: 'CAD' },
+    { from: 'USD', to: 'INR' },
+    { from: 'EUR', to: 'INR' },
+    { from: 'GBP', to: 'INR' },
+    { from: 'NZD', to: 'USD' },
+    { from: 'USD', to: 'SGD' },
+    { from: 'USD', to: 'HKD' },
   ];
 
   return pairs.map(({ from, to }) => {
-    const cur = to === 'USD' ? (1 / (rates[from] || 1)) : (rates[to] || 1);
-    const prev = to === 'USD'
-      ? (1 / (histRates[from] || rates[from] || 1))
-      : (histRates[to] || rates[to] || 1);
+    let cur: number, prev: number;
+    if (to === 'USD') {
+      cur = 1 / (rates[from] || 1);
+      prev = 1 / (histRates[from] || rates[from] || 1);
+    } else if (from === 'USD') {
+      cur = rates[to] || 1;
+      prev = histRates[to] || rates[to] || 1;
+    } else {
+      // Cross pair like EUR/INR = USD/INR * (1/USD/EUR) = USD/INR / USD/EUR
+      cur = (rates[to] || 1) / (rates[from] || 1);
+      prev = (histRates[to] || rates[to] || 1) / (histRates[from] || rates[from] || 1);
+    }
     const changePct = prev ? Math.abs(((cur - prev) / prev) * 100) : 0;
-    // Derive volatility from actual price change (annualized approximation)
     const volatility = changePct * Math.sqrt(252);
-    const trend = cur > prev ? 'rising' : cur < prev ? 'falling' : 'stable';
+    const trend: 'rising' | 'falling' | 'stable' = cur > prev ? 'rising' : cur < prev ? 'falling' : 'stable';
     return {
       pair: `${from}/${to}`,
       volatility: Math.round(volatility * 10) / 10,
-      volume: 0, // Real volume requires premium feed
       trend,
       rate: cur,
       change: cur - prev,
       changePct: ((cur - prev) / prev) * 100,
+      prevClose: prev,
     };
   });
 };
 
+// Session color helpers — concrete class maps for Tailwind JIT
+const SESSION_DOT: Record<string, string> = {
+  active_sydney: 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.5)] animate-pulse',
+  active_tokyo: 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.5)] animate-pulse',
+  active_london: 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)] animate-pulse',
+  active_ny: 'bg-purple-400 shadow-[0_0_6px_rgba(168,85,247,0.5)] animate-pulse',
+  inactive: 'bg-gray-600',
+};
+const SESSION_TEXT: Record<string, string> = {
+  active_sydney: 'text-cyan-400',
+  active_tokyo: 'text-cyan-400',
+  active_london: 'text-emerald-400',
+  active_ny: 'text-purple-400',
+  inactive: 'text-gray-600',
+};
+
+// Chart pair selector options
+const CHART_PAIRS = [
+  { symbol: 'FX_IDC:USDINR', label: 'USD/INR' },
+  { symbol: 'FX_IDC:EURUSD', label: 'EUR/USD' },
+  { symbol: 'FX_IDC:GBPUSD', label: 'GBP/USD' },
+  { symbol: 'FX_IDC:USDJPY', label: 'USD/JPY' },
+  { symbol: 'FX_IDC:AUDUSD', label: 'AUD/USD' },
+  { symbol: 'FX_IDC:USDCAD', label: 'USD/CAD' },
+  { symbol: 'FX_IDC:USDCHF', label: 'USD/CHF' },
+  { symbol: 'FX_IDC:EURINR', label: 'EUR/INR' },
+  { symbol: 'FX_IDC:GBPINR', label: 'GBP/INR' },
+  { symbol: 'FX_IDC:NZDUSD', label: 'NZD/USD' },
+];
+
 export default function CurrencyPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [marketTime, setMarketTime] = useState(new Date());
+  const [chartPair, setChartPair] = useState(CHART_PAIRS[0]);
+  const [selectedVolPair, setSelectedVolPair] = useState<VolatilityItem | null>(null);
 
-  // Real-time market status
-  const { data: marketStatus, isLoading: statusLoading } = useQuery({
-    queryKey: ['market-status'],
-    queryFn: fetchMarketStatus,
-    refetchInterval: 60000,
-  });
-
-  // Real-time volatility data
+  // Real-time volatility data (expanded pairs including INR)
   const { data: volatilityData, isLoading: volatilityLoading } = useQuery({
     queryKey: ['volatility-data'],
     queryFn: fetchVolatilityData,
@@ -103,36 +138,53 @@ export default function CurrencyPage() {
 
   // Update market time every second
   useEffect(() => {
-    const timer = setInterval(() => {
-      setMarketTime(new Date());
-    }, 1000);
+    const timer = setInterval(() => setMarketTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // Derived: USD/INR from volatility data
+  const usdInr = useMemo(() => volatilityData?.find(v => v.pair === 'USD/INR'), [volatilityData]);
+
   // Calculate real forex session statuses based on current UTC time
   const forexSessions = useMemo(() => {
-    const now = marketTime;
-    const utcH = now.getUTCHours() + now.getUTCMinutes() / 60;
-    // Sessions in UTC: Sydney 21:00-06:00, Tokyo 00:00-09:00, London 07:00-16:00, New York 12:00-21:00
+    const utcH = marketTime.getUTCHours() + marketTime.getUTCMinutes() / 60;
     const isSydney = utcH >= 21 || utcH < 6;
     const isTokyo = utcH >= 0 && utcH < 9;
     const isLondon = utcH >= 7 && utcH < 16;
     const isNewYork = utcH >= 12 && utcH < 21;
     return [
-      { name: 'Sydney', active: isSydney, time: '21:00-06:00 UTC', color: isSydney ? 'cyan' : 'gray' },
-      { name: 'Tokyo', active: isTokyo, time: '00:00-09:00 UTC', color: isTokyo ? 'cyan' : 'gray' },
-      { name: 'London', active: isLondon, time: '07:00-16:00 UTC', color: isLondon ? 'emerald' : 'gray' },
-      { name: 'New York', active: isNewYork, time: '12:00-21:00 UTC', color: isNewYork ? 'purple' : 'gray' },
+      { name: 'Sydney', active: isSydney, time: '21:00-06:00 UTC', key: 'sydney' as const },
+      { name: 'Tokyo', active: isTokyo, time: '00:00-09:00 UTC', key: 'tokyo' as const },
+      { name: 'London', active: isLondon, time: '07:00-16:00 UTC', key: 'london' as const },
+      { name: 'New York', active: isNewYork, time: '12:00-21:00 UTC', key: 'ny' as const },
     ];
   }, [marketTime]);
 
   const activeSessions = forexSessions.filter(s => s.active).length;
 
+  // Avg volatility
+  const avgVol = useMemo(() => {
+    if (!volatilityData?.length) return 0;
+    return volatilityData.reduce((a, v) => a + v.volatility, 0) / volatilityData.length;
+  }, [volatilityData]);
+
+  // Market sentiment from live data
+  const sentimentPct = useMemo(() => {
+    if (!volatilityData?.length) return 50;
+    const positive = volatilityData.filter(v => v.changePct > 0).length;
+    return Math.round((positive / volatilityData.length) * 100);
+  }, [volatilityData]);
+
+  const getSessionClasses = useCallback((session: { active: boolean; key: string }) => {
+    const id = session.active ? `active_${session.key}` : 'inactive';
+    return { dot: SESSION_DOT[id] || SESSION_DOT.inactive, text: SESSION_TEXT[id] || SESSION_TEXT.inactive };
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#050505] text-emerald-400 font-mono">
       <div className="container mx-auto px-4 py-6 space-y-6">
         
-        {/* Terminal-style Trading Header */}
+        {/* ═══ HEADER ═══ */}
         <div className="relative overflow-hidden rounded-xl border border-emerald-500/15 bg-[#0a0a0a]">
           <div className="absolute inset-0" style={{
             backgroundImage: `radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.04) 0%, transparent 50%),
@@ -146,11 +198,11 @@ export default function CurrencyPage() {
                 <h1 className="text-3xl lg:text-4xl font-bold text-emerald-400 tracking-tight drop-shadow-[0_0_12px_rgba(16,185,129,0.3)]">
                   FX TRADING HUB
                 </h1>
-                <p className="text-cyan-400/60 text-sm mt-1 tracking-wider">PROFESSIONAL CURRENCY MARKETS • LIVE FEED</p>
+                <p className="text-cyan-400/60 text-sm mt-1 tracking-wider">PROFESSIONAL CURRENCY MARKETS &bull; LIVE FEED</p>
               </div>
               <div className="ml-auto hidden md:flex items-center gap-3">
                 <div className="px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.4)] animate-pulse" />
                   <span className="text-emerald-400 text-xs font-bold">LIVE</span>
                 </div>
                 <span className="text-cyan-400/50 text-xs">
@@ -160,76 +212,95 @@ export default function CurrencyPage() {
               </div>
             </div>
             
-            {/* Real-time Market Status Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-              <div className="card-terminal rounded-lg p-3 text-center border border-emerald-500/15 bg-[#0d0d0d]">
-                <div className="flex items-center justify-center gap-2 mb-1.5">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
-                  <span className="text-[10px] font-semibold text-emerald-400/80">MARKET STATUS</span>
-                </div>
-                <div className="text-lg font-bold text-emerald-400">
-                  {statusLoading ? 'SYNC...' : marketStatus?.isMarketOpen ? 'LIVE' : 'CLOSED'}
-                </div>
-                <div className="text-[10px] text-gray-500 flex items-center justify-center gap-1 mt-0.5">
-                  <Clock className="w-2.5 h-2.5" />
-                  {marketTime.toLocaleTimeString('en-US', { hour12: false })}
+            {/* ═══ USD/INR HERO + Quick Stats ═══ */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-5">
+              {/* USD/INR Hero Card */}
+              <div className="md:col-span-2 rounded-xl p-4 border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-cyan-500/5 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl" />
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-2">
+                    <IndianRupee className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-bold text-emerald-400/80 tracking-wider">USD / INR</span>
+                    <Badge className="ml-auto bg-emerald-500/15 text-emerald-300 text-[9px] border-emerald-500/20">
+                      LIVE
+                    </Badge>
+                  </div>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-3xl font-black text-emerald-400 tabular-nums drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]">
+                      {usdInr ? `₹${usdInr.rate.toFixed(4)}` : volatilityLoading ? '...' : '₹--'}
+                    </span>
+                    {usdInr && (
+                      <span className={`text-sm font-bold flex items-center gap-0.5 ${
+                        usdInr.changePct >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                      }`}>
+                        {usdInr.changePct >= 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                        {usdInr.changePct >= 0 ? '+' : ''}{usdInr.changePct.toFixed(3)}%
+                      </span>
+                    )}
+                  </div>
+                  {usdInr && (
+                    <div className="flex items-center gap-4 mt-2 text-[10px] text-gray-400">
+                      <span>Prev: ₹{usdInr.prevClose.toFixed(4)}</span>
+                      <span>Chg: {usdInr.change >= 0 ? '+' : ''}{usdInr.change.toFixed(4)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
-              
-              <div className="card-terminal rounded-lg p-3 text-center border border-cyan-500/15 bg-[#0d0d0d]">
-                <div className="flex items-center justify-center gap-2 mb-1.5">
-                  <BarChart3 className="w-3 h-3 text-cyan-400" />
-                  <span className="text-[10px] font-semibold text-cyan-400/80">ACTIVE PAIRS</span>
+
+              {/* Quick stat cards */}
+              <div className="rounded-lg p-3 text-center border border-emerald-500/15 bg-[#0d0d0d]">
+                <div className="flex items-center justify-center gap-1.5 mb-1.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.4)] animate-pulse" />
+                  <span className="text-[10px] font-semibold text-emerald-400/80">MARKET</span>
                 </div>
-                <div className="text-lg font-bold text-cyan-400">
-                  {statusLoading ? '...' : marketStatus?.totalPairs || 168}
-                </div>
-                <div className="text-[10px] text-gray-500">Currency Pairs</div>
+                <div className="text-lg font-bold text-emerald-400">{activeSessions > 0 ? 'OPEN' : 'LOW'}</div>
+                <div className="text-[10px] text-gray-500">{activeSessions}/4 Sessions</div>
               </div>
               
-              <div className="card-terminal rounded-lg p-3 text-center border border-purple-500/15 bg-[#0d0d0d]">
-                <div className="flex items-center justify-center gap-2 mb-1.5">
+              <div className="rounded-lg p-3 text-center border border-purple-500/15 bg-[#0d0d0d]">
+                <div className="flex items-center justify-center gap-1.5 mb-1.5">
                   <Activity className="w-3 h-3 text-purple-400" />
                   <span className="text-[10px] font-semibold text-purple-400/80">VOLATILITY</span>
                 </div>
                 <div className="text-lg font-bold text-purple-400">
-                  {volatilityLoading ? '...' : volatilityData ? `${(volatilityData.reduce((a, v) => a + v.volatility, 0) / volatilityData.length).toFixed(1)}%` : '--'}
+                  {volatilityLoading ? '...' : `${avgVol.toFixed(1)}%`}
                 </div>
-                <div className="text-[10px] text-gray-500">Daily Average</div>
+                <div className="text-[10px] text-gray-500">
+                  {avgVol > 15 ? 'High' : avgVol > 8 ? 'Moderate' : 'Low'}
+                </div>
               </div>
               
-              <div className="card-terminal rounded-lg p-3 text-center border border-amber-500/15 bg-[#0d0d0d]">
-                <div className="flex items-center justify-center gap-2 mb-1.5">
+              <div className="rounded-lg p-3 text-center border border-amber-500/15 bg-[#0d0d0d]">
+                <div className="flex items-center justify-center gap-1.5 mb-1.5">
                   <Zap className="w-3 h-3 text-amber-400" />
-                  <span className="text-[10px] font-semibold text-amber-400/80">SPREAD</span>
+                  <span className="text-[10px] font-semibold text-amber-400/80">SENTIMENT</span>
                 </div>
-                <div className="text-lg font-bold text-amber-400">0.8</div>
-                <div className="text-[10px] text-gray-500">Avg Pips</div>
+                <div className={`text-lg font-bold ${sentimentPct >= 50 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {sentimentPct}%
+                </div>
+                <div className="text-[10px] text-gray-500">{sentimentPct >= 50 ? 'Risk-On' : 'Risk-Off'}</div>
               </div>
             </div>
               
-            {/* Trading Sessions Bar — Live */}
+            {/* Sessions Bar — fixed Tailwind classes */}
             <div className="rounded-lg p-3 border border-emerald-500/10 bg-[#0d0d0d]">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-4">
                   <span className="text-[10px] font-semibold text-gray-500 tracking-wider">SESSIONS:</span>
-                  {forexSessions.map(session => (
-                    <div key={session.name} className="flex items-center gap-1.5">
-                      <div className={`w-1.5 h-1.5 rounded-full ${
-                        session.active 
-                          ? `bg-${session.color}-400 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse` 
-                          : 'bg-gray-600'
-                      }`} />
-                      <span className={`text-[10px] font-medium ${
-                        session.active ? `text-${session.color}-400` : 'text-gray-600'
-                      }`}>
-                        {session.name}
-                      </span>
-                    </div>
-                  ))}
+                  {forexSessions.map(session => {
+                    const cls = getSessionClasses(session);
+                    return (
+                      <div key={session.name} className="flex items-center gap-1.5">
+                        <div className={`w-1.5 h-1.5 rounded-full ${cls.dot}`} />
+                        <span className={`text-[10px] font-medium ${cls.text}`}>
+                          {session.name}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="text-[10px] text-gray-500">
-                  {activeSessions}/4 SESSIONS ACTIVE • FX MARKET {activeSessions > 0 ? 'OPEN' : 'LOW ACTIVITY'}
+                  {activeSessions}/4 ACTIVE &bull; FX MARKET {activeSessions > 0 ? 'OPEN 24/5' : 'LOW ACTIVITY'}
                 </div>
               </div>
             </div>
@@ -301,8 +372,8 @@ export default function CurrencyPage() {
                       <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 relative overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent" />
                         <div className="relative">
-                          <div className="text-xl font-bold text-blue-400 font-mono">{statusLoading ? '...' : marketStatus?.totalPairs || 170}</div>
-                          <div className="text-xs text-slate-400">Active Pairs</div>
+                          <div className="text-xl font-bold text-blue-400 font-mono">{volatilityData?.length || 12}</div>
+                          <div className="text-xs text-slate-400">Tracked Pairs</div>
                           <div className="text-[10px] text-blue-500 flex items-center gap-1 mt-1">
                             <Activity className="w-2 h-2" />
                             Trading
@@ -429,6 +500,52 @@ export default function CurrencyPage() {
           </TabsContent>
 
           <TabsContent value="charts" className="space-y-6">
+            {/* Live Pair Chart with Selector */}
+            <Card className="bg-slate-800/50 border-slate-700/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-emerald-500" />
+                  Live Chart
+                  <div className="ml-auto flex items-center gap-2 flex-wrap">
+                    {CHART_PAIRS.map(p => (
+                      <Button
+                        key={p.symbol}
+                        size="sm"
+                        variant={chartPair.symbol === p.symbol ? 'default' : 'outline'}
+                        className={`text-[10px] h-6 px-2 ${
+                          chartPair.symbol === p.symbol
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                            : 'border-slate-600 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30'
+                        }`}
+                        onClick={() => setChartPair(p)}
+                      >
+                        {p.label}
+                      </Button>
+                    ))}
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <TVLazyWidget
+                  key={chartPair.symbol}
+                  src={`${TVUrl}mini-symbol-overview.js`}
+                  height="400px"
+                  skeletonHeight="h-[400px]"
+                  config={{
+                    symbol: chartPair.symbol,
+                    width: '100%',
+                    height: '400',
+                    locale: 'en',
+                    dateRange: '1M',
+                    colorTheme: 'dark',
+                    isTransparent: true,
+                    autosize: true,
+                    largeChartUrl: '',
+                  }}
+                />
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Forex Heat Map */}
               <Card className="bg-slate-800/50 border-slate-700/50">
@@ -790,7 +907,7 @@ export default function CurrencyPage() {
                               <div>
                                 <div className="font-bold text-sm">{item.pair}</div>
                                 <div className="text-xs text-slate-400">
-                                  Vol: {(item.volume / 1e9).toFixed(1)}B
+                                  Rate: {item.rate.toFixed(item.pair.includes('JPY') || item.pair.includes('INR') ? 2 : 4)}
                                 </div>
                               </div>
                             </div>
@@ -845,22 +962,22 @@ export default function CurrencyPage() {
                   <CardContent className="space-y-3">
                     {forexSessions.map(session => {
                       const isActive = session.active;
+                      const cls = getSessionClasses(session);
+                      const activeBg = session.key === 'london' ? 'bg-emerald-500/10 border-emerald-500/30'
+                        : session.key === 'ny' ? 'bg-purple-500/10 border-purple-500/30'
+                        : 'bg-cyan-500/10 border-cyan-500/30';
                       return (
                         <div key={session.name} className={`p-3 rounded-lg border transition-all ${
-                          isActive 
-                            ? `bg-${session.color}-500/10 border-${session.color}-500/30` 
-                            : 'bg-slate-700/20 border-slate-600/30'
+                          isActive ? activeBg : 'bg-slate-700/20 border-slate-600/30'
                         }`}>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div className={`w-3 h-3 rounded-full ${
-                                isActive 
-                                  ? `bg-${session.color}-500 animate-pulse` 
-                                  : 'bg-slate-500'
+                                isActive ? cls.dot : 'bg-slate-500'
                               }`} />
                               <div>
                                 <div className={`font-semibold text-sm ${
-                                  isActive ? `text-${session.color}-300` : 'text-slate-400'
+                                  isActive ? cls.text : 'text-slate-400'
                                 }`}>
                                   {session.name}
                                 </div>
@@ -869,15 +986,11 @@ export default function CurrencyPage() {
                             </div>
                             <div className="text-right">
                               <Badge variant={isActive ? 'default' : 'secondary'} className={`text-xs ${
-                                isActive 
-                                  ? `bg-${session.color}-500/20 text-${session.color}-300 border-${session.color}-500/30`
-                                  : 'bg-slate-600/20 text-slate-400'
+                                isActive ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-slate-600/20 text-slate-400'
                               }`}>
                                 {isActive ? 'ACTIVE' : 'CLOSED'}
                               </Badge>
-                              <div className={`text-xs mt-1 ${
-                                isActive ? `text-${session.color}-400` : 'text-slate-500'
-                              }`}>
+                              <div className={`text-xs mt-1 ${isActive ? cls.text : 'text-slate-500'}`}>
                                 {isActive ? 'High activity' : 'Session ended'}
                               </div>
                             </div>
@@ -893,63 +1006,42 @@ export default function CurrencyPage() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <TrendingUp className="w-5 h-5 text-amber-500" />
-                      Institutional Outlook
+                      Live Pair Analysis
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {[
-                      {
-                        title: 'USD Strength Index',
-                        analysis: 'Federal Reserve hawkish stance continues to support USD. Watch for FOMC minutes and NFP data.',
-                        sentiment: 'bullish',
-                        confidence: 78,
-                        timeframe: 'Short-term'
-                      },
-                      {
-                        title: 'EUR Outlook',
-                        analysis: 'ECB policy divergence creates headwinds. German manufacturing PMI and inflation data key.',
-                        sentiment: 'bearish',
-                        confidence: 65,
-                        timeframe: 'Medium-term'
-                      },
-                      {
-                        title: 'GBP Volatility',
-                        analysis: 'Brexit trade tensions and BoE policy uncertainty drive higher volatility expectations.',
-                        sentiment: 'neutral',
-                        confidence: 52,
-                        timeframe: 'Short-term'
-                      },
-                      {
-                        title: 'JPY Safe Haven',
-                        analysis: 'Risk-off sentiment supports yen strength. BoJ intervention levels around 150 remain critical.',
-                        sentiment: 'bullish',
-                        confidence: 71,
-                        timeframe: 'Long-term'
-                      }
-                    ].map((item, index) => {
-                      const sentimentColor = item.sentiment === 'bullish' ? 'emerald' : 
-                                            item.sentiment === 'bearish' ? 'rose' : 'slate';
+                    {volatilityData?.map((item) => {
+                      const isBullish = item.changePct > 0.05;
+                      const isBearish = item.changePct < -0.05;
+                      const sentimentLabel = isBullish ? 'BULLISH' : isBearish ? 'BEARISH' : 'NEUTRAL';
+                      const sentimentBorder = isBullish ? 'border-emerald-500/50 text-emerald-400' 
+                        : isBearish ? 'border-rose-500/50 text-rose-400' 
+                        : 'border-slate-500/50 text-slate-400';
+                      const confidence = Math.min(Math.round(Math.abs(item.changePct) * 40 + 40), 95);
                       
                       return (
-                        <div key={index} className="p-3 rounded-lg bg-slate-700/30 border border-slate-600/30 hover:bg-slate-700/50 transition-all">
+                        <div key={item.pair} className="p-3 rounded-lg bg-slate-700/30 border border-slate-600/30 hover:bg-slate-700/50 transition-all">
                           <div className="flex items-start justify-between mb-2">
-                            <h4 className="font-semibold text-sm text-amber-300">{item.title}</h4>
+                            <h4 className="font-semibold text-sm text-amber-300">{item.pair}</h4>
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline" className={`text-xs border-${sentimentColor}-500/50 text-${sentimentColor}-400`}>
-                                {item.sentiment.toUpperCase()}
+                              <Badge variant="outline" className={`text-xs ${sentimentBorder}`}>
+                                {sentimentLabel}
                               </Badge>
                               <Badge variant="secondary" className="text-xs">
-                                {item.timeframe}
+                                Vol: {item.volatility.toFixed(1)}%
                               </Badge>
                             </div>
                           </div>
-                          <p className="text-xs text-slate-300 leading-relaxed mb-3">{item.analysis}</p>
-                          
+                          <p className="text-xs text-slate-300 leading-relaxed mb-3">
+                            Rate: {item.rate.toFixed(item.pair.includes('JPY') || item.pair.includes('INR') ? 2 : 4)} &bull; 
+                            Change: {item.changePct >= 0 ? '+' : ''}{item.changePct.toFixed(3)}% &bull; 
+                            Trend: {item.trend}
+                          </p>
                           <div className="flex items-center justify-between">
-                            <span className="text-xs text-slate-400">Confidence Level</span>
+                            <span className="text-xs text-slate-400">Strength</span>
                             <div className="flex items-center gap-2">
-                              <Progress value={item.confidence} className="w-16 h-2" />
-                              <span className="text-xs font-mono text-slate-300">{item.confidence}%</span>
+                              <Progress value={confidence} className="w-16 h-2" />
+                              <span className="text-xs font-mono text-slate-300">{confidence}%</span>
                             </div>
                           </div>
                         </div>

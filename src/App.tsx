@@ -14,6 +14,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const News = lazy(() => import("./pages/News"));
 const Economic = lazy(() => import("./pages/Economic"));
 const Research = lazy(() => import("./pages/Research"));
+const ResearchAdmin = lazy(() => import("./pages/ResearchAdmin"));
 const Sentimental = lazy(() => import("./pages/Sentimental"));
 const Journaling = lazy(() => import("./pages/Journaling"));
 const Events = lazy(() => import("./pages/Events"));
@@ -59,6 +60,7 @@ const App = () => (
                 <Route path="/news" element={<News />} />
                 <Route path="/economic" element={<Economic />} />
                 <Route path="/research" element={<Research />} />
+                <Route path="/research-admin" element={<ResearchAdmin />} />
                 <Route path="/sentimental" element={<Sentimental />} />
                 <Route path="/journaling" element={<Journaling />} />
                 <Route path="/events" element={<Events />} />
